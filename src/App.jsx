@@ -94,9 +94,7 @@ function AudioPlayer({ file }) {
 }
 
 // ---------- song detail view ----------
-function SongDetail({ song, folderId, folders, setFolders, onBack, onDelete, onAssign }) {
-  if (!song) return null;
-
+function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign }) {
   const [showNewLink, setShowNewLink] = useState(false);
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl]     = useState("");
@@ -104,6 +102,8 @@ function SongDetail({ song, folderId, folders, setFolders, onBack, onDelete, onA
   const [editLinkLabel, setEditLinkLabel] = useState("");
   const [editLinkUrl, setEditLinkUrl]     = useState("");
   const fileInputRef = useRef();
+
+  if (!song) return null;
 
   function updateSong(patch) {
     setFolders(prev => {
@@ -331,25 +331,30 @@ function SongRow({ song, folderName, folderColor, onClick }) {
 // ============================================================
 export default function SongVault() {
   // ── Auth + cloud sync ──
-  const [session,  setSession]  = useState(undefined); // undefined=loading, null=logged out
-  const [loading,  setLoading]  = useState(true);
+  const initialSession = getStoredSession() ?? null;
+  const [session,  setSession]  = useState(initialSession);
+  const [loading,  setLoading]  = useState(!!initialSession);
   const [state,    setStateRaw] = useState({ folders: [], unassigned: [] });
   const saveTimerRef            = useRef(null);
 
-  useEffect(() => {
-    const stored = getStoredSession();
-    if (stored) { setSession(stored); loadData(); }
-    else { setSession(null); setLoading(false); }
-  }, []);
-
   async function loadData() {
-    setLoading(true);
     const res = await apiGetData();
     if (res.data) {
       setStateRaw({ folders: res.data.folders ?? [], unassigned: res.data.unassigned ?? [] });
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (getStoredSession()) {
+      apiGetData().then(res => {
+        if (res.data) {
+          setStateRaw({ folders: res.data.folders ?? [], unassigned: res.data.unassigned ?? [] });
+        }
+        setLoading(false);
+      });
+    }
+  }, []);
 
   // Debounced auto-save — fires 1.5s after last state change
   useEffect(() => {
@@ -710,7 +715,6 @@ export default function SongVault() {
             folderId={activeSongContext}
             folders={state}
             setFolders={setState}
-            onBack={backFromSong}
             onDelete={deleteSong}
             onAssign={assignSongToFolder}
           />
