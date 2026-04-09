@@ -51,3 +51,8 @@ export async function apiGetData() {
 export async function apiSaveData(data) {
   return request("PUT", "/api/data", { data });
 }
+
+export async function apiSearchUsers(query) {
+  return request("GET", `/api/users/search?q=${encodeURIComponent(query)}`);
+}
+

@@ -14,7 +14,7 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from "react";
-import { getStoredSession, apiLogout, apiGetData, apiSaveData } from "./api";
+import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers } from "./api";
 import AuthScreen from "./AuthScreen";
 
 const COLORS = ["#0A84FF", "#30D158", "#FF9F0A", "#FF375F", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A"];
@@ -94,9 +94,7 @@ function AudioPlayer({ file }) {
 }
 
 // ---------- song detail view ----------
-function SongDetail({ song, folderId, folders, setFolders, onBack, onDelete }) {
-  if (!song) return null;
-
+function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign }) {
   const [showNewLink, setShowNewLink] = useState(false);
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl]     = useState("");
@@ -104,6 +102,8 @@ function SongDetail({ song, folderId, folders, setFolders, onBack, onDelete }) {
   const [editLinkLabel, setEditLinkLabel] = useState("");
   const [editLinkUrl, setEditLinkUrl]     = useState("");
   const fileInputRef = useRef();
+
+  if (!song) return null;
 
   function updateSong(patch) {
     setFolders(prev => {
@@ -187,6 +187,23 @@ function SongDetail({ song, folderId, folders, setFolders, onBack, onDelete }) {
           </button>
         ))}
       </div>
+
+      {/* Assign to project */}
+      {folderId === "unassigned" && folders.folders.length > 0 && (
+        <div style={cardStyle}>
+          <div style={sectionLabel}>Project</div>
+          <select
+            defaultValue=""
+            onChange={e => { if (e.target.value) onAssign(song.id, e.target.value); }}
+            style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 15, background: T.input, color: T.text, appearance: "none" }}
+          >
+            <option value="" disabled>Move to project...</option>
+            {folders.folders.map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Notes */}
       <div style={cardStyle}>
@@ -314,25 +331,30 @@ function SongRow({ song, folderName, folderColor, onClick }) {
 // ============================================================
 export default function SongVault() {
   // ── Auth + cloud sync ──
-  const [session,  setSession]  = useState(undefined); // undefined=loading, null=logged out
-  const [loading,  setLoading]  = useState(true);
+  const initialSession = getStoredSession() ?? null;
+  const [session,  setSession]  = useState(initialSession);
+  const [loading,  setLoading]  = useState(!!initialSession);
   const [state,    setStateRaw] = useState({ folders: [], unassigned: [] });
   const saveTimerRef            = useRef(null);
 
-  useEffect(() => {
-    const stored = getStoredSession();
-    if (stored) { setSession(stored); loadData(); }
-    else { setSession(null); setLoading(false); }
-  }, []);
-
   async function loadData() {
-    setLoading(true);
     const res = await apiGetData();
     if (res.data) {
       setStateRaw({ folders: res.data.folders ?? [], unassigned: res.data.unassigned ?? [] });
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (getStoredSession()) {
+      apiGetData().then(res => {
+        if (res.data) {
+          setStateRaw({ folders: res.data.folders ?? [], unassigned: res.data.unassigned ?? [] });
+        }
+        setLoading(false);
+      });
+    }
+  }, []);
 
   // Debounced auto-save — fires 1.5s after last state change
   useEffect(() => {
@@ -387,6 +409,18 @@ export default function SongVault() {
   const [showNewSong,  setShowNewSong]  = useState(false);
   const [newSongTitle, setNewSongTitle] = useState("");
 
+  const [userQuery,    setUserQuery]    = useState("");
+  const [userResults,  setUserResults]  = useState(null); // null=not searched, []= no results
+  const [userSearching, setUserSearching] = useState(false);
+
+  async function searchUsers() {
+    if (!userQuery.trim()) return;
+    setUserSearching(true);
+    const res = await apiSearchUsers(userQuery.trim());
+    setUserSearching(false);
+    setUserResults(res.users ?? []);
+  }
+
   function createFolder() {
     if (!newFolderName.trim()) return;
     const f = { id: genId(), name: newFolderName.trim(), color: newFolderColor, songs: [] };
@@ -428,6 +462,18 @@ export default function SongVault() {
     }
     setActiveSongId(null);
     setActiveSongContext(null);
+  }
+
+  function assignSongToFolder(songId, folderId) {
+    setState(prev => {
+      const song = prev.unassigned.find(s => s.id === songId);
+      if (!song) return prev;
+      return {
+        unassigned: prev.unassigned.filter(s => s.id !== songId),
+        folders: prev.folders.map(f => f.id !== folderId ? f : { ...f, songs: [...f.songs, song] })
+      };
+    });
+    setActiveSongContext(folderId);
   }
 
   function openSong(songId, context) { setActiveSongId(songId); setActiveSongContext(context); }
@@ -681,8 +727,8 @@ export default function SongVault() {
             folderId={activeSongContext}
             folders={state}
             setFolders={setState}
-            onBack={backFromSong}
             onDelete={deleteSong}
+            onAssign={assignSongToFolder}
           />
         ) : (
 
@@ -891,6 +937,46 @@ export default function SongVault() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Find Users */}
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: T.text, marginBottom: 12 }}>Find Users</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                    <input
+                      placeholder="Search by username..."
+                      value={userQuery}
+                      onChange={e => { setUserQuery(e.target.value); setUserResults(null); }}
+                      onKeyDown={e => { if (e.key === "Enter") searchUsers(); }}
+                      style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: `1px solid ${T.border}`, fontSize: 15, background: T.input, color: T.text, outline: "none", fontFamily: "inherit" }}
+                    />
+                    <button
+                      onClick={searchUsers}
+                      disabled={userSearching || !userQuery.trim()}
+                      style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: T.accent, color: "#fff", fontSize: 15, fontWeight: 600, opacity: (userSearching || !userQuery.trim()) ? 0.5 : 1, cursor: (userSearching || !userQuery.trim()) ? "not-allowed" : "pointer" }}>
+                      {userSearching ? "…" : "Search"}
+                    </button>
+                  </div>
+                  {userResults !== null && (
+                    <div style={listCard}>
+                      {userResults.length === 0 ? (
+                        <div style={{ padding: "16px", textAlign: "center", color: T.textMuted, fontSize: 15 }}>No users found</div>
+                      ) : userResults.map((u, i) => (
+                        <div key={u.id}>
+                          {i > 0 && <div style={{ height: 1, background: T.divider, marginLeft: 54 }} />}
+                          <div style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: "50%", background: T.accent + "30", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 16, fontWeight: 700, color: T.accent }}>
+                              {(u.username || u.email)?.[0]?.toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 15, fontWeight: 500, color: T.text }}>{u.username || "—"}</div>
+                              <div style={{ fontSize: 13, color: T.textMuted }}>{u.email}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ marginTop: 24 }}>
