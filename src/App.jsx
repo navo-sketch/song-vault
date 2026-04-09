@@ -14,24 +14,15 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from "react";
+import { supabase } from "./supabaseClient";
+import AuthScreen from "./AuthScreen";
 
 const COLORS = ["#0A84FF", "#30D158", "#FF9F0A", "#FF375F", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A"];
 const STORAGE_KEY = "song-vault-v1";
 
 function genId() { return Math.random().toString(36).slice(2, 9); }
 
-// ---------- persistence ----------
-function loadState() {
-  try {
-    const s = localStorage.getItem(STORAGE_KEY);
-    if (!s) return { folders: [], unassigned: [] };
-    const parsed = JSON.parse(s);
-    return { folders: parsed.folders || [], unassigned: parsed.unassigned || [] };
-  } catch { return { folders: [], unassigned: [] }; }
-}
-function saveState(state) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-}
+// ---------- persistence handled via Supabase (see SongVault component) ----------
 
 // ---------- dark theme palette ----------
 const T = {
@@ -322,8 +313,57 @@ function SongRow({ song, folderName, folderColor, onClick }) {
 // Main app
 // ============================================================
 export default function SongVault() {
-  const [state, setStateRaw] = useState(loadState);
-  useEffect(() => { saveState(state); }, [state]);
+  // ── Auth + cloud sync ──
+  const [session,  setSession]  = useState(undefined); // undefined=loading, null=logged out
+  const [loading,  setLoading]  = useState(true);
+  const [state,    setStateRaw] = useState({ folders: [], unassigned: [] });
+  const saveTimerRef            = useRef(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) loadData(session.user.id);
+      else setLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) { setLoading(true); loadData(session.user.id); }
+      else { setStateRaw({ folders: [], unassigned: [] }); setLoading(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function loadData(userId) {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("song_data").select("data").eq("user_id", userId).maybeSingle();
+    if (!error && data?.data) {
+      setStateRaw({ folders: data.data.folders ?? [], unassigned: data.data.unassigned ?? [] });
+    }
+    setLoading(false);
+  }
+
+  // Debounced auto-save — fires 1.5s after last state change
+  useEffect(() => {
+    if (!session || loading) return;
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      supabase.from("song_data").upsert(
+        { user_id: session.user.id, data: state, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+    }, 1500);
+    return () => clearTimeout(saveTimerRef.current);
+  }, [state, session, loading]);
+
+  async function handleLogout() {
+    clearTimeout(saveTimerRef.current);
+    await supabase.from("song_data").upsert(
+      { user_id: session.user.id, data: state, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    );
+    await supabase.auth.signOut();
+  }
 
   function setState(updater) {
     setStateRaw(prev => {
@@ -441,7 +481,18 @@ export default function SongVault() {
         </button>
       );
     }
-    return <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>Song Vault</span>;
+    const displayName = session?.user?.user_metadata?.username || session?.user?.email?.split("@")[0] || "Vault";
+    return (
+      <>
+        <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>Song Vault</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 13, color: T.textMuted, marginRight: 10 }}>{displayName}</span>
+        <button onClick={handleLogout}
+          style={{ background: "none", border: `1px solid ${T.border}`, color: T.textMuted, fontSize: 13, borderRadius: 8, padding: "5px 10px", cursor: "pointer" }}>
+          Sign Out
+        </button>
+      </>
+    );
   }
 
   const formCard = { background: T.card, borderRadius: 14, padding: 16, boxShadow: T.shadow };
@@ -451,6 +502,20 @@ export default function SongVault() {
   const dashedBtn    = (color) => ({ width: "100%", padding: "14px", borderRadius: 12, border: `2px dashed ${T.border}`, background: "transparent", fontSize: 15, color: color || T.accent, fontWeight: 500 });
   const listCard     = { background: T.card, borderRadius: 14, overflow: "hidden", boxShadow: T.shadow, marginBottom: 16 };
   const rowDivider   = { height: 1, background: T.divider, marginLeft: 16 };
+
+  // ── Auth gates ──
+  if (session === undefined) return (
+    <div style={{ minHeight: "100dvh", background: "#0F0F11", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ color: "#98989D", fontSize: 15, fontFamily: "Inter, sans-serif" }}>Loading…</div>
+    </div>
+  );
+  if (!session) return <AuthScreen />;
+  if (loading) return (
+    <div style={{ minHeight: "100dvh", background: "#0F0F11", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
+      <div style={{ fontSize: 32 }}>🎵</div>
+      <div style={{ color: "#98989D", fontSize: 15, fontFamily: "Inter, sans-serif" }}>Loading your vault…</div>
+    </div>
+  );
 
   const TAB_ICONS = {
     songs:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
