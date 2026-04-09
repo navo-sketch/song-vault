@@ -180,8 +180,8 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
     const genre = aiGenre.trim() || "general";
     const theme = aiTheme.trim() || "personal experience";
     let prompt;
-    if (aiType === "bars") {
-      prompt = `Write ${aiCount} bars of rap lyrics with strong rhyming end words (AABB or ABAB scheme). Genre: ${genre}. Theme: ${theme}. Output only the bars, no intro or explanation. Each bar on its own line.`;
+    if (aiType === "endwords") {
+      prompt = `Generate ${aiCount} sets of rhyming ending words for rap bars. Genre: ${genre}. Theme: ${theme}. Format: each line should be a single rhyming word only — no full sentences, no explanations. Group into rhyme pairs or sets of 4. Output only the words, one per line.`;
     } else {
       prompt = `Write ${aiCount} lines of song lyrics for a ${genre} song. Theme: ${theme}. Output only the lyrics, no intro or explanation. Each line on its own line.`;
     }
@@ -355,12 +355,12 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
         {aiOpen && (
           <div style={{ marginTop: 14 }}>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              {["lyrics", "bars"].map(t => (
+              {["lyrics", "endwords"].map(t => (
                 <button key={t} onClick={() => setAiType(t)}
                   style={{ flex: 1, padding: "8px", borderRadius: 9, border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer",
                     background: aiType === t ? T.accent : T.cardAlt,
                     color: aiType === t ? "#fff" : T.textMuted }}>
-                  {t === "bars" ? "🎤 Bars" : "🎵 Lyrics"}
+                  {t === "endwords" ? "🎤 Ending Words" : "🎵 Lyrics"}
                 </button>
               ))}
             </div>
