@@ -18,6 +18,27 @@ import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers, a
 import AuthScreen from "./AuthScreen";
 import LandingPage from "./LandingPage";
 
+// ---------- global audio player (lock screen) ----------
+const globalAudioElement = new Audio();
+globalAudioElement.crossOrigin = "anonymous";
+
+async function getYouTubeAudioUrl(videoId) {
+  try {
+    const res = await fetch(`https://api.cobalt.tools/api/json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        audioFormat: "best"
+      })
+    });
+    const data = await res.json();
+    return data.url || null;
+  } catch {
+    return null;
+  }
+}
+
 const COLORS = ["#0A84FF", "#30D158", "#FF9F0A", "#FF375F", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A"];
 const STORAGE_KEY = "song-vault-v1";
 
@@ -127,7 +148,7 @@ function LinkPlayer({ url }) {
 }
 
 // ---------- song detail view ----------
-function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, soundcloudProfile }) {
+function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, soundcloudProfile, onPlayAudio }) {
   const [showNewLink, setShowNewLink] = useState(false);
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl]     = useState("");
@@ -340,7 +361,17 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
                     <button onClick={e => { e.stopPropagation(); removeLink(link.id); }}
                       style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1 }}>×</button>
                   </div>
-                  {isExpanded && <LinkPlayer url={link.url} />}
+                  {isExpanded && (
+                    <div style={{ marginTop: 12 }}>
+                      <LinkPlayer url={link.url} />
+                      {getYouTubeId(link.url) && (
+                        <button onClick={() => onPlayAudio(song, "youtube")}
+                          style={{ marginTop: 10, padding: "8px 14px", borderRadius: 8, background: T.accent, border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                          ▶ Play audio in background
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -376,6 +407,12 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
               <EditableText value={file.name} onSave={val => val.trim() && renameFile(file.id, val.trim())}
                 placeholder="filename" style={{ flex: 1, fontSize: 14, color: T.text }} />
               <span style={{ fontSize: 12, color: T.textFaint, flexShrink: 0 }}>{(file.size / 1024).toFixed(0)} KB</span>
+              {file.type?.startsWith("audio/") && (
+                <button onClick={() => onPlayAudio(song, "file")}
+                  style={{ background: "none", border: "none", color: T.accent, fontSize: 16, padding: 0, cursor: "pointer" }}>
+                  ▶
+                </button>
+              )}
               <a href={file.dataUrl} download={file.name} style={{ color: T.accent, fontSize: 13, textDecoration: "none", flexShrink: 0 }}>↓</a>
               <button onClick={e => { e.stopPropagation(); removeFile(file.id); }}
                 style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1 }}>×</button>
@@ -565,6 +602,8 @@ export default function SongVault() {
   const [scSending,    setScSending]    = useState(false);
   const [scError,      setScError]      = useState(null);
 
+  const [nowPlaying,   setNowPlaying]   = useState(null);
+
   function normalizeScUrl(raw) { return raw.trim().replace(/^https?:\/\//i, "").replace(/\/$/, ""); }
 
   async function scSendCode() {
@@ -601,6 +640,51 @@ export default function SongVault() {
     setUserSearching(false);
     setUserResults(res.users ?? []);
   }
+
+  async function playAudio(song, source) {
+    if (!song) return;
+    let audioUrl = null;
+    let title = song.title || "Untitled";
+    let artist = "";
+
+    if (source === "file") {
+      const audioFile = song.files?.find(f => f.type?.startsWith("audio/"));
+      if (audioFile?.dataUrl) {
+        audioUrl = audioFile.dataUrl;
+        artist = "Song Vault";
+      }
+    } else if (source === "youtube") {
+      const link = song.links?.find(l => getYouTubeId(l.url));
+      if (link) {
+        const ytId = getYouTubeId(link.url);
+        artist = `YouTube · ${link.label}`;
+        audioUrl = await getYouTubeAudioUrl(ytId);
+      }
+    }
+
+    if (!audioUrl) return;
+
+    globalAudioElement.src = audioUrl;
+    globalAudioElement.play().catch(() => {});
+    setNowPlaying({ title, artist });
+
+    if (navigator.mediaSession) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title,
+        artist,
+        album: "Song Vault"
+      });
+      navigator.mediaSession.setActionHandler("play", () => globalAudioElement.play());
+      navigator.mediaSession.setActionHandler("pause", () => globalAudioElement.pause());
+    }
+  }
+
+  useEffect(() => {
+    if (!nowPlaying) return;
+    if (navigator.mediaSession) {
+      navigator.mediaSession.playbackState = globalAudioElement.paused ? "paused" : "playing";
+    }
+  }, [nowPlaying]);
 
   function createFolder() {
     if (!newFolderName.trim()) return;
@@ -945,6 +1029,7 @@ export default function SongVault() {
             onDelete={archiveSong}
             onAssign={assignSongToFolder}
             soundcloudProfile={soundcloudProfile}
+            onPlayAudio={playAudio}
           />
         ) : (
 
