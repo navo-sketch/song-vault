@@ -416,7 +416,7 @@ export default function SongVault() {
     cursor: "pointer", transition: "all 0.15s"
   });
 
-  function NavBar() {
+  function renderNavBar() {
     if (activeSong) {
       const backLabel = activeSongContext === "unassigned"
         ? "Songs"
@@ -463,7 +463,7 @@ export default function SongVault() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body, #root { height: 100%; overflow: hidden; background: ${T.bg}; }
+        html, body, #root { height: 100%; height: 100dvh; overflow: hidden; background: ${T.bg}; }
         button { cursor: pointer; font-family: inherit; }
         input, textarea { font-family: inherit; }
         textarea:focus, input:focus { outline: none; }
@@ -478,6 +478,7 @@ export default function SongVault() {
         /* ── Layout shell ── */
         .app-root {
           height: 100vh;
+          height: 100dvh;
           display: flex;
           flex-direction: column;
           overflow: hidden;
@@ -586,7 +587,7 @@ export default function SongVault() {
 
       {/* Nav bar */}
       <div className="app-nav">
-        <NavBar />
+        {renderNavBar()}
       </div>
 
       <div className="app-body">
