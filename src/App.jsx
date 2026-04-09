@@ -326,7 +326,10 @@ export default function SongVault() {
   useEffect(() => { saveState(state); }, [state]);
 
   function setState(updater) {
-    setStateRaw(prev => typeof updater === "function" ? updater(prev) : { ...prev, ...updater });
+    setStateRaw(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      return { ...prev, ...next };
+    });
   }
 
   const { folders, unassigned } = state;
