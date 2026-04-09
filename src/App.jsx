@@ -14,7 +14,7 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from "react";
-import { supabase } from "./supabaseClient";
+import { getStoredSession, apiLogout, apiGetData, apiSaveData } from "./api";
 import AuthScreen from "./AuthScreen";
 
 const COLORS = ["#0A84FF", "#30D158", "#FF9F0A", "#FF375F", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A"];
@@ -320,25 +320,16 @@ export default function SongVault() {
   const saveTimerRef            = useRef(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) loadData(session.user.id);
-      else setLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) { setLoading(true); loadData(session.user.id); }
-      else { setStateRaw({ folders: [], unassigned: [] }); setLoading(false); }
-    });
-    return () => subscription.unsubscribe();
+    const stored = getStoredSession();
+    if (stored) { setSession(stored); loadData(); }
+    else { setSession(null); setLoading(false); }
   }, []);
 
-  async function loadData(userId) {
+  async function loadData() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("song_data").select("data").eq("user_id", userId).maybeSingle();
-    if (!error && data?.data) {
-      setStateRaw({ folders: data.data.folders ?? [], unassigned: data.data.unassigned ?? [] });
+    const res = await apiGetData();
+    if (res.data) {
+      setStateRaw({ folders: res.data.folders ?? [], unassigned: res.data.unassigned ?? [] });
     }
     setLoading(false);
   }
@@ -347,22 +338,21 @@ export default function SongVault() {
   useEffect(() => {
     if (!session || loading) return;
     clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      supabase.from("song_data").upsert(
-        { user_id: session.user.id, data: state, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
-      );
-    }, 1500);
+    saveTimerRef.current = setTimeout(() => { apiSaveData(state); }, 1500);
     return () => clearTimeout(saveTimerRef.current);
   }, [state, session, loading]);
 
+  function handleAuth(user) {
+    setSession({ user });
+    loadData();
+  }
+
   async function handleLogout() {
     clearTimeout(saveTimerRef.current);
-    await supabase.from("song_data").upsert(
-      { user_id: session.user.id, data: state, updated_at: new Date().toISOString() },
-      { onConflict: "user_id" }
-    );
-    await supabase.auth.signOut();
+    await apiSaveData(state);
+    apiLogout();
+    setSession(null);
+    setStateRaw({ folders: [], unassigned: [] });
   }
 
   function setState(updater) {
@@ -481,7 +471,7 @@ export default function SongVault() {
         </button>
       );
     }
-    const displayName = session?.user?.user_metadata?.username || session?.user?.email?.split("@")[0] || "Vault";
+    const displayName = session?.user?.username || session?.user?.email?.split("@")[0] || "Vault";
     return (
       <>
         <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>Song Vault</span>
@@ -509,7 +499,7 @@ export default function SongVault() {
       <div style={{ color: "#98989D", fontSize: 15, fontFamily: "Inter, sans-serif" }}>Loading…</div>
     </div>
   );
-  if (!session) return <AuthScreen />;
+  if (!session) return <AuthScreen onAuth={handleAuth} />;
   if (loading) return (
     <div style={{ minHeight: "100dvh", background: "#0F0F11", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
       <div style={{ fontSize: 32 }}>🎵</div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "./supabaseClient";
+import { apiLogin, apiSignup } from "./api";
 
 const T = {
   bg: "#0F0F11", card: "#1C1C1E", input: "#2C2C2E",
@@ -7,33 +7,24 @@ const T = {
   accent: "#0A84FF", danger: "#FF453A",
 };
 
-export default function AuthScreen() {
+export default function AuthScreen({ onAuth }) {
   const [mode, setMode]         = useState("login");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [error, setError]       = useState(null);
   const [loading, setLoading]   = useState(false);
-  const [done, setDone]         = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
-    if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { username: username.trim() || email.split("@")[0] } },
-      });
-      if (error) setError(error.message);
-      else setDone(true);
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
-    }
+    const res = mode === "signup"
+      ? await apiSignup(email, password, username)
+      : await apiLogin(email, password);
     setLoading(false);
+    if (res.error) { setError(res.error); return; }
+    onAuth(res.user);
   }
 
   const inputStyle = {
@@ -62,12 +53,10 @@ export default function AuthScreen() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         input::placeholder { color: #48484A; }
-        input:focus { border-color: #0A84FF !important; }
+        input:focus { border-color: #0A84FF !important; outline: none; }
       `}</style>
 
       <div style={{ width: "100%", maxWidth: 380 }}>
-
-        {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>🎵</div>
           <div style={{ fontSize: 26, fontWeight: 700, color: T.text, letterSpacing: -0.5 }}>Song Vault</div>
@@ -76,77 +65,39 @@ export default function AuthScreen() {
           </div>
         </div>
 
-        {done ? (
-          /* Confirm email state */
-          <div style={{ background: T.card, borderRadius: 16, padding: 28, textAlign: "center" }}>
-            <div style={{ fontSize: 32, marginBottom: 14 }}>📬</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: T.text, marginBottom: 8 }}>Check your email</div>
-            <div style={{ fontSize: 14, color: T.textMuted, lineHeight: 1.6 }}>
-              We sent a confirmation link to{" "}
-              <span style={{ color: T.text, fontWeight: 500 }}>{email}</span>.
-              Click it then come back to sign in.
-            </div>
-            <button onClick={() => { setMode("login"); setDone(false); }} style={{ ...btnStyle, marginTop: 20 }}>
-              Back to Sign In
-            </button>
+        <form onSubmit={handleSubmit} style={{ background: T.card, borderRadius: 16, padding: 24 }}>
+          {mode === "signup" && (
+            <input type="text" placeholder="Display name (optional)"
+              value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} />
+          )}
+          <input type="email" placeholder="Email" required
+            value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+          <input type="password" placeholder="Password" required minLength={6}
+            value={password} onChange={e => setPassword(e.target.value)}
+            style={{ ...inputStyle, marginBottom: error ? 10 : 16 }} />
+
+          {error && (
+            <div style={{ fontSize: 13, color: T.danger, marginBottom: 14, textAlign: "center" }}>{error}</div>
+          )}
+
+          <button type="submit" disabled={loading} style={btnStyle}>
+            {loading ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}
+          </button>
+
+          <div style={{ textAlign: "center", marginTop: 16, fontSize: 14, color: T.textMuted }}>
+            {mode === "login" ? (
+              <>No account?{" "}
+                <button type="button" onClick={() => { setMode("signup"); setError(null); }} style={linkBtn}>
+                  Sign up free
+                </button></>
+            ) : (
+              <>Already have an account?{" "}
+                <button type="button" onClick={() => { setMode("login"); setError(null); }} style={linkBtn}>
+                  Sign in
+                </button></>
+            )}
           </div>
-        ) : (
-          /* Login / Signup form */
-          <form onSubmit={handleSubmit} style={{ background: T.card, borderRadius: 16, padding: 24 }}>
-            {mode === "signup" && (
-              <input
-                type="text"
-                placeholder="Display name (optional)"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                style={inputStyle}
-              />
-            )}
-            <input
-              type="email"
-              placeholder="Email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              style={inputStyle}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              required
-              minLength={6}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              style={{ ...inputStyle, marginBottom: error ? 10 : 16 }}
-            />
-
-            {error && (
-              <div style={{ fontSize: 13, color: T.danger, marginBottom: 14, textAlign: "center", lineHeight: 1.4 }}>
-                {error}
-              </div>
-            )}
-
-            <button type="submit" disabled={loading} style={btnStyle}>
-              {loading ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}
-            </button>
-
-            <div style={{ textAlign: "center", marginTop: 16, fontSize: 14, color: T.textMuted }}>
-              {mode === "login" ? (
-                <>No account?{" "}
-                  <button type="button" onClick={() => { setMode("signup"); setError(null); }} style={linkBtn}>
-                    Sign up free
-                  </button>
-                </>
-              ) : (
-                <>Already have an account?{" "}
-                  <button type="button" onClick={() => { setMode("login"); setError(null); }} style={linkBtn}>
-                    Sign in
-                  </button>
-                </>
-              )}
-            </div>
-          </form>
-        )}
+        </form>
       </div>
     </div>
   );
