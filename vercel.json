@@ -1,8 +1,10 @@
 {
+  "name": "songvault",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "alias": ["songvault.vercel.app"]
 }
