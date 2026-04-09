@@ -56,3 +56,11 @@ export async function apiSearchUsers(query) {
   return request("GET", `/api/users/search?q=${encodeURIComponent(query)}`);
 }
 
+export async function apiSoundCloudSendCode(profileUrl) {
+  return request("POST", "/api/soundcloud/send-code", { profileUrl });
+}
+
+export async function apiSoundCloudVerifyCode(profileUrl, code) {
+  return request("POST", "/api/soundcloud/verify-code", { profileUrl, code });
+}
+

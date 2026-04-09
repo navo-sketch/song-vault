@@ -14,7 +14,7 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from "react";
-import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers } from "./api";
+import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers, apiSoundCloudSendCode, apiSoundCloudVerifyCode } from "./api";
 import AuthScreen from "./AuthScreen";
 import LandingPage from "./LandingPage";
 
@@ -94,8 +94,35 @@ function AudioPlayer({ file }) {
   );
 }
 
+// ---------- link embed helpers ----------
+function getYouTubeId(url) {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+function getLinkEmbed(url) {
+  const ytId = getYouTubeId(url);
+  if (ytId) return `https://www.youtube.com/embed/${ytId}?autoplay=1`;
+  return null;
+}
+
+function LinkPlayer({ url }) {
+  const src = getLinkEmbed(url);
+  if (!src) return null;
+  return (
+    <div style={{ borderRadius: 10, overflow: "hidden", marginTop: 8, background: "#000" }}>
+      <iframe
+        src={src}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        style={{ width: "100%", height: 200, border: "none", display: "block" }}
+        title="YouTube player"
+      />
+    </div>
+  );
+}
+
 // ---------- song detail view ----------
-function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign }) {
+function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, soundcloudProfile }) {
   const [showNewLink, setShowNewLink] = useState(false);
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl]     = useState("");
@@ -110,6 +137,8 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
   const [editingCreditId, setEditingCreditId] = useState(null);
   const [editCreditName,  setEditCreditName]  = useState("");
   const [editCreditRole,  setEditCreditRole]  = useState("");
+
+  const [expandedLinkId,  setExpandedLinkId]  = useState(null);
 
   if (!song) return null;
 
@@ -209,6 +238,30 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
         ))}
       </div>
 
+      {/* Release ready */}
+      {song.status === "done" && (
+        <div style={{ ...cardStyle, borderLeft: `3px solid ${STATUS.done.color}` }}>
+          <div style={sectionLabel}>Release Ready</div>
+          {soundcloudProfile?.verified ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 22 }}>🎧</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{soundcloudProfile.username || soundcloudProfile.url}</div>
+                <div style={{ fontSize: 13, color: T.textMuted }}>SoundCloud connected</div>
+              </div>
+              <a href={`https://${soundcloudProfile.url}`} target="_blank" rel="noopener noreferrer"
+                style={{ padding: "8px 14px", borderRadius: 9, border: "none", background: T.accent, color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                Open SoundCloud
+              </a>
+            </div>
+          ) : (
+            <div style={{ fontSize: 14, color: T.textMuted }}>
+              Connect your SoundCloud account in <strong style={{ color: T.text }}>More → SoundCloud</strong> to manage your release.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Assign to project */}
       {folderId === "unassigned" && folders.folders.length > 0 && (
         <div style={cardStyle}>
@@ -245,34 +298,49 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
       {/* Links */}
       <div style={cardStyle}>
         <div style={sectionLabel}>Links</div>
-        {song.links?.map((link, i) => (
-          <div key={link.id}>
-            {i > 0 && <Divider />}
-            {editingLinkId === link.id ? (
-              <div>
-                <input autoFocus value={editLinkLabel} onChange={e => setEditLinkLabel(e.target.value)} placeholder="Label"
-                  style={{ ...inputStyle, border: `1px solid ${T.accent}` }} />
-                <input value={editLinkUrl} onChange={e => setEditLinkUrl(e.target.value)} placeholder="https://..."
-                  onKeyDown={e => { if (e.key === "Enter") saveEditLink(); if (e.key === "Escape") setEditingLinkId(null); }}
-                  style={{ ...inputStyle, marginBottom: 10 }} />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setEditingLinkId(null)} style={{ flex: 1, padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, fontSize: 14, color: T.text }}>Cancel</button>
-                  <button onClick={saveEditLink} style={{ flex: 1, padding: "9px", borderRadius: 9, border: "none", background: T.accent, fontSize: 14, fontWeight: 600, color: "#fff" }}>Save</button>
+        {song.links?.map((link, i) => {
+          const embed = getLinkEmbed(link.url);
+          const isExpanded = expandedLinkId === link.id;
+          return (
+            <div key={link.id}>
+              {i > 0 && <Divider />}
+              {editingLinkId === link.id ? (
+                <div>
+                  <input autoFocus value={editLinkLabel} onChange={e => setEditLinkLabel(e.target.value)} placeholder="Label"
+                    style={{ ...inputStyle, border: `1px solid ${T.accent}` }} />
+                  <input value={editLinkUrl} onChange={e => setEditLinkUrl(e.target.value)} placeholder="https://..."
+                    onKeyDown={e => { if (e.key === "Enter") saveEditLink(); if (e.key === "Escape") setEditingLinkId(null); }}
+                    style={{ ...inputStyle, marginBottom: 10 }} />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setEditingLinkId(null)} style={{ flex: 1, padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, fontSize: 14, color: T.text }}>Cancel</button>
+                    <button onClick={saveEditLink} style={{ flex: 1, padding: "9px", borderRadius: 9, border: "none", background: T.accent, fontSize: 14, fontWeight: 600, color: "#fff" }}>Save</button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 17 }}>🔗</span>
-                <a href={link.url} target="_blank" rel="noopener noreferrer"
-                  style={{ flex: 1, color: T.accent, fontSize: 15, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{link.label}</a>
-                <button onClick={() => { setEditingLinkId(link.id); setEditLinkLabel(link.label); setEditLinkUrl(link.url); }}
-                  style={{ background: "none", border: "none", color: T.accent, fontSize: 13, opacity: 0.8 }}>Edit</button>
-                <button onClick={e => { e.stopPropagation(); removeLink(link.id); }}
-                  style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1 }}>×</button>
-              </div>
-            )}
-          </div>
-        ))}
+              ) : (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {embed ? (
+                      <button onClick={() => setExpandedLinkId(isExpanded ? null : link.id)}
+                        style={{ background: "none", border: "none", fontSize: 17, padding: 0, lineHeight: 1, cursor: "pointer" }}
+                        title={isExpanded ? "Close player" : "Play on YouTube"}>
+                        {isExpanded ? "⏹" : "▶️"}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 17 }}>🔗</span>
+                    )}
+                    <a href={link.url} target="_blank" rel="noopener noreferrer"
+                      style={{ flex: 1, color: T.accent, fontSize: 15, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{link.label}</a>
+                    <button onClick={() => { setEditingLinkId(link.id); setEditLinkLabel(link.label); setEditLinkUrl(link.url); }}
+                      style={{ background: "none", border: "none", color: T.accent, fontSize: 13, opacity: 0.8 }}>Edit</button>
+                    <button onClick={e => { e.stopPropagation(); removeLink(link.id); }}
+                      style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1 }}>×</button>
+                  </div>
+                  {isExpanded && <LinkPlayer url={link.url} />}
+                </div>
+              )}
+            </div>
+          );
+        })}
         {song.links?.length > 0 && <Divider />}
         {showNewLink ? (
           <div>
@@ -406,23 +474,23 @@ export default function SongVault() {
   const [session,  setSession]  = useState(initialSession);
   const [loading,  setLoading]  = useState(!!initialSession);
   const [showAuth, setShowAuth] = useState(false);
-  const [state,    setStateRaw] = useState({ folders: [], unassigned: [] });
+  const [state,    setStateRaw] = useState({ folders: [], unassigned: [], soundcloudProfile: null });
   const saveTimerRef            = useRef(null);
+
+  function hydrateState(data) {
+    setStateRaw({ folders: data.folders ?? [], unassigned: data.unassigned ?? [], soundcloudProfile: data.soundcloudProfile ?? null });
+  }
 
   async function loadData() {
     const res = await apiGetData();
-    if (res.data) {
-      setStateRaw({ folders: res.data.folders ?? [], unassigned: res.data.unassigned ?? [] });
-    }
+    if (res.data) hydrateState(res.data);
     setLoading(false);
   }
 
   useEffect(() => {
     if (getStoredSession()) {
       apiGetData().then(res => {
-        if (res.data) {
-          setStateRaw({ folders: res.data.folders ?? [], unassigned: res.data.unassigned ?? [] });
-        }
+        if (res.data) hydrateState(res.data);
         setLoading(false);
       });
     }
@@ -456,7 +524,7 @@ export default function SongVault() {
     });
   }
 
-  const { folders, unassigned } = state;
+  const { folders, unassigned, soundcloudProfile } = state;
 
   const [tab, setTab] = useState("songs");
   const [activeFolderId, setActiveFolderId] = useState(null);
@@ -482,8 +550,39 @@ export default function SongVault() {
   const [newSongTitle, setNewSongTitle] = useState("");
 
   const [userQuery,    setUserQuery]    = useState("");
-  const [userResults,  setUserResults]  = useState(null); // null=not searched, []= no results
+  const [userResults,  setUserResults]  = useState(null);
   const [userSearching, setUserSearching] = useState(false);
+
+  const [scInput,      setScInput]      = useState(soundcloudProfile?.url || "");
+  const [scCodeSent,   setScCodeSent]   = useState(false);
+  const [scCode,       setScCode]       = useState("");
+  const [scVerifying,  setScVerifying]  = useState(false);
+  const [scSending,    setScSending]    = useState(false);
+  const [scError,      setScError]      = useState(null);
+
+  async function scSendCode() {
+    if (!scInput.trim()) return;
+    setScSending(true); setScError(null);
+    const res = await apiSoundCloudSendCode(scInput.trim());
+    setScSending(false);
+    if (res.error) { setScError(res.error); return; }
+    setScCodeSent(true);
+  }
+
+  async function scVerify() {
+    if (!scCode.trim()) return;
+    setScVerifying(true); setScError(null);
+    const res = await apiSoundCloudVerifyCode(scInput.trim(), scCode.trim());
+    setScVerifying(false);
+    if (res.error || !res.verified) { setScError(res.error || "Code incorrect or expired."); return; }
+    setState({ soundcloudProfile: { url: scInput.trim(), username: res.username || scInput.trim(), verified: true } });
+    setScCodeSent(false); setScCode("");
+  }
+
+  function scDisconnect() {
+    setState({ soundcloudProfile: null });
+    setScInput(""); setScCodeSent(false); setScCode(""); setScError(null);
+  }
 
   async function searchUsers() {
     if (!userQuery.trim()) return;
@@ -807,6 +906,7 @@ export default function SongVault() {
             setFolders={setState}
             onDelete={deleteSong}
             onAssign={assignSongToFolder}
+            soundcloudProfile={soundcloudProfile}
           />
         ) : (
 
@@ -1015,6 +1115,76 @@ export default function SongVault() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* SoundCloud */}
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: T.text, marginBottom: 12 }}>SoundCloud</div>
+                  {soundcloudProfile?.verified ? (
+                    <div style={{ ...listCard, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: 22 }}>🎧</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{soundcloudProfile.username || soundcloudProfile.url}</div>
+                        <a href={`https://${soundcloudProfile.url}`} target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 13, color: T.accent, textDecoration: "none" }}>{soundcloudProfile.url}</a>
+                      </div>
+                      <button onClick={scDisconnect}
+                        style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, color: T.textMuted, fontSize: 13, padding: "6px 12px" }}>
+                        Disconnect
+                      </button>
+                    </div>
+                  ) : scCodeSent ? (
+                    <div style={listCard}>
+                      <div style={{ padding: "14px 16px" }}>
+                        <div style={{ fontSize: 14, color: T.textMuted, marginBottom: 12 }}>
+                          A 6-digit code was sent to your email. Enter it below to verify ownership of <strong style={{ color: T.text }}>{scInput}</strong>.
+                        </div>
+                        <input
+                          autoFocus
+                          placeholder="6-digit code"
+                          value={scCode}
+                          onChange={e => { setScCode(e.target.value); setScError(null); }}
+                          onKeyDown={e => { if (e.key === "Enter") scVerify(); }}
+                          maxLength={6}
+                          style={{ width: "100%", padding: "10px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 16, letterSpacing: 6, background: T.input, color: T.text, marginBottom: 10 }}
+                        />
+                        {scError && <div style={{ fontSize: 13, color: T.danger, marginBottom: 10 }}>{scError}</div>}
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => { setScCodeSent(false); setScCode(""); setScError(null); }}
+                            style={{ flex: 1, padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, fontSize: 14, color: T.text }}>Back</button>
+                          <button onClick={scVerify} disabled={scVerifying || scCode.length < 6}
+                            style={{ flex: 1, padding: "9px", borderRadius: 9, border: "none", background: T.accent, fontSize: 14, fontWeight: 600, color: "#fff", opacity: (scVerifying || scCode.length < 6) ? 0.5 : 1 }}>
+                            {scVerifying ? "Verifying…" : "Verify"}
+                          </button>
+                        </div>
+                        <button onClick={scSendCode} style={{ background: "none", border: "none", color: T.accent, fontSize: 13, marginTop: 10, padding: 0 }}>
+                          Resend code
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={listCard}>
+                      <div style={{ padding: "14px 16px" }}>
+                        <div style={{ fontSize: 14, color: T.textMuted, marginBottom: 12 }}>
+                          Enter your SoundCloud profile URL. A verification code will be sent to your email.
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <input
+                            placeholder="soundcloud.com/yourname"
+                            value={scInput}
+                            onChange={e => { setScInput(e.target.value); setScError(null); }}
+                            onKeyDown={e => { if (e.key === "Enter") scSendCode(); }}
+                            style={{ flex: 1, padding: "10px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 15, background: T.input, color: T.text }}
+                          />
+                          <button onClick={scSendCode} disabled={scSending || !scInput.trim()}
+                            style={{ padding: "10px 16px", borderRadius: 9, border: "none", background: T.accent, color: "#fff", fontSize: 15, fontWeight: 600, opacity: (scSending || !scInput.trim()) ? 0.5 : 1 }}>
+                            {scSending ? "…" : "Send Code"}
+                          </button>
+                        </div>
+                        {scError && <div style={{ fontSize: 13, color: T.danger, marginTop: 8 }}>{scError}</div>}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Find Users */}
