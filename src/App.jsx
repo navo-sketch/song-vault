@@ -432,10 +432,10 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
         )}
       </div>
 
-      {/* Delete song */}
+      {/* Archive song */}
       <button onClick={e => { e.stopPropagation(); onDelete(song.id); }}
-        style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: T.card, fontSize: 15, color: T.danger, fontWeight: 500, boxShadow: T.shadow }}>
-        Delete Song
+        style={{ width: "100%", padding: "13px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.card, fontSize: 15, color: T.textMuted, fontWeight: 500, boxShadow: T.shadow }}>
+        Archive Song
       </button>
     </div>
   );
@@ -474,11 +474,11 @@ export default function SongVault() {
   const [session,  setSession]  = useState(initialSession);
   const [loading,  setLoading]  = useState(!!initialSession);
   const [showAuth, setShowAuth] = useState(false);
-  const [state,    setStateRaw] = useState({ folders: [], unassigned: [], soundcloudProfile: null });
+  const [state,    setStateRaw] = useState({ folders: [], unassigned: [], archived: [], soundcloudProfile: null });
   const saveTimerRef            = useRef(null);
 
   function hydrateState(data) {
-    setStateRaw({ folders: data.folders ?? [], unassigned: data.unassigned ?? [], soundcloudProfile: data.soundcloudProfile ?? null });
+    setStateRaw({ folders: data.folders ?? [], unassigned: data.unassigned ?? [], archived: data.archived ?? [], soundcloudProfile: data.soundcloudProfile ?? null });
   }
 
   async function loadData() {
@@ -514,7 +514,7 @@ export default function SongVault() {
     await apiSaveData(state);
     apiLogout();
     setSession(null);
-    setStateRaw({ folders: [], unassigned: [], soundcloudProfile: null });
+    setStateRaw({ folders: [], unassigned: [], archived: [], soundcloudProfile: null });
   }
 
   function setState(updater) {
@@ -524,7 +524,7 @@ export default function SongVault() {
     });
   }
 
-  const { folders, unassigned, soundcloudProfile } = state;
+  const { folders, unassigned, archived, soundcloudProfile } = state;
 
   const [tab, setTab] = useState("songs");
   const [activeFolderId, setActiveFolderId] = useState(null);
@@ -629,15 +629,43 @@ export default function SongVault() {
     setNewSongTitle(""); setShowNewSong(false);
   }
 
-  function deleteSong(id) {
-    if (!confirm("Delete this song?")) return;
-    if (activeSongContext === "unassigned") {
-      setState(prev => ({ unassigned: prev.unassigned.filter(s => s.id !== id) }));
-    } else {
-      setState(prev => ({ folders: prev.folders.map(f => f.id !== activeSongContext ? f : { ...f, songs: f.songs.filter(s => s.id !== id) }) }));
-    }
+  function archiveSong(id) {
+    setState(prev => {
+      let song = null;
+      let updatedFolders = prev.folders;
+      let updatedUnassigned = prev.unassigned;
+      if (activeSongContext === "unassigned") {
+        song = prev.unassigned.find(s => s.id === id);
+        updatedUnassigned = prev.unassigned.filter(s => s.id !== id);
+      } else {
+        const folder = prev.folders.find(f => f.id === activeSongContext);
+        song = folder?.songs.find(s => s.id === id);
+        updatedFolders = prev.folders.map(f => f.id !== activeSongContext ? f : { ...f, songs: f.songs.filter(s => s.id !== id) });
+      }
+      if (!song) return prev;
+      const archivedEntry = { ...song, _archivedFrom: activeSongContext, _archivedAt: Date.now() };
+      return { folders: updatedFolders, unassigned: updatedUnassigned, archived: [...prev.archived, archivedEntry] };
+    });
     setActiveSongId(null);
     setActiveSongContext(null);
+  }
+
+  function restoreSong(id) {
+    setState(prev => {
+      const song = prev.archived.find(s => s.id === id);
+      if (!song) return prev;
+      const { _archivedFrom, _archivedAt, ...cleanSong } = song;
+      const newArchived = prev.archived.filter(s => s.id !== id);
+      if (_archivedFrom === "unassigned" || !prev.folders.find(f => f.id === _archivedFrom)) {
+        return { archived: newArchived, unassigned: [...prev.unassigned, cleanSong] };
+      }
+      return { archived: newArchived, folders: prev.folders.map(f => f.id !== _archivedFrom ? f : { ...f, songs: [...f.songs, cleanSong] }) };
+    });
+  }
+
+  function permanentlyDeleteSong(id) {
+    if (!confirm("Permanently delete this song? This cannot be undone.")) return;
+    setState(prev => ({ archived: prev.archived.filter(s => s.id !== id) }));
   }
 
   function assignSongToFolder(songId, folderId) {
@@ -680,8 +708,8 @@ export default function SongVault() {
             {backLabel}
           </button>
           <div style={{ flex: 1 }} />
-          <button onClick={e => { e.stopPropagation(); deleteSong(activeSong.id); }}
-            style={{ background: "none", border: "none", color: T.danger, fontSize: 15 }}>Delete</button>
+          <button onClick={e => { e.stopPropagation(); archiveSong(activeSong.id); }}
+            style={{ background: "none", border: "none", color: T.textMuted, fontSize: 15 }}>Archive</button>
         </>
       );
     }
@@ -909,7 +937,7 @@ export default function SongVault() {
             folderId={activeSongContext}
             folders={state}
             setFolders={setState}
-            onDelete={deleteSong}
+            onDelete={archiveSong}
             onAssign={assignSongToFolder}
             soundcloudProfile={soundcloudProfile}
           />
@@ -972,6 +1000,38 @@ export default function SongVault() {
                   <button onClick={() => { setActiveFolderId(null); setShowNewSong(true); }} className="press" style={dashedBtn()}>
                     + New Song
                   </button>
+                )}
+
+                {archived.length > 0 && (
+                  <div style={{ marginTop: 32 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.textMuted, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6, paddingLeft: 4 }}>Archived</div>
+                    <div style={listCard}>
+                      {archived.map((song, i) => {
+                        const origin = song._archivedFrom === "unassigned" ? "Unassigned" : (folders.find(f => f.id === song._archivedFrom)?.name ?? "Unknown");
+                        const st = STATUS[song.status] || STATUS.idea;
+                        return (
+                          <div key={song.id}>
+                            {i > 0 && <div style={rowDivider} />}
+                            <div style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 15, fontWeight: 500, color: T.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{song.title}</div>
+                                <div style={{ fontSize: 12, color: T.textFaint, marginTop: 2 }}>
+                                  <span style={{ color: st.color }}>{st.label}</span>
+                                  {" · "}from {origin}
+                                </div>
+                              </div>
+                              <button onClick={() => restoreSong(song.id)}
+                                style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, color: T.accent, fontSize: 13, padding: "5px 10px", flexShrink: 0 }}>
+                                Restore
+                              </button>
+                              <button onClick={() => permanentlyDeleteSong(song.id)}
+                                style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1, flexShrink: 0 }}>×</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -1111,6 +1171,7 @@ export default function SongVault() {
                     { label: "Unassigned songs",   value: unassigned.length },
                     { label: "Songs with lyrics",  value: allSongs.filter(({ song }) => song.lyrics?.trim()).length },
                     { label: "Songs with audio",   value: allSongs.filter(({ song }) => song.files?.some(f => f.type?.startsWith("audio/"))).length },
+                    { label: "Archived songs",     value: archived.length },
                   ].map(({ label, value }, i) => (
                     <div key={label}>
                       {i > 0 && <div style={{ height: 1, background: T.divider, marginLeft: 16 }} />}
@@ -1234,7 +1295,7 @@ export default function SongVault() {
 
                 <div style={{ marginTop: 24 }}>
                   <button
-                    onClick={() => { if (confirm("Clear ALL data? This cannot be undone.")) { setState({ folders: [], unassigned: [], soundcloudProfile: null }); setScInput(""); setScCodeSent(false); setScCode(""); setScError(null); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); } }}
+                    onClick={() => { if (confirm("Clear ALL data? This cannot be undone.")) { setState({ folders: [], unassigned: [], archived: [], soundcloudProfile: null }); setScInput(""); setScCodeSent(false); setScCode(""); setScError(null); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); } }}
                     style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: T.card, fontSize: 15, color: T.danger, fontWeight: 500, boxShadow: T.shadow }}>
                     Clear All Data
                   </button>
