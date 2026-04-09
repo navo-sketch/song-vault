@@ -452,11 +452,18 @@ export default function SongVault() {
   const listCard     = { background: T.card, borderRadius: 14, overflow: "hidden", boxShadow: T.shadow, marginBottom: 16 };
   const rowDivider   = { height: 1, background: T.divider, marginLeft: 16 };
 
+  const TAB_ICONS = {
+    songs:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
+    projects: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+    more:     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
+  };
+
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif", color: T.text }}>
+    <div className="app-root" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif", color: T.text }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body, #root { height: 100%; overflow: hidden; background: ${T.bg}; }
         button { cursor: pointer; font-family: inherit; }
         input, textarea { font-family: inherit; }
         textarea:focus, input:focus { outline: none; }
@@ -464,28 +471,152 @@ export default function SongVault() {
         .row:hover { background: #252527 !important; }
         .press:active { opacity: 0.7; }
         audio { border-radius: 8px; }
-        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #3A3A3C; border-radius: 3px; }
+
+        /* ── Layout shell ── */
+        .app-root {
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          background: ${T.bg};
+        }
+        .app-nav {
+          flex-shrink: 0;
+          background: rgba(15,15,17,0.92);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-bottom: 1px solid rgba(255,255,255,0.07);
+          padding: 0 20px;
+          height: 52px;
+          display: flex;
+          align-items: center;
+          z-index: 10;
+        }
+        .app-body {
+          flex: 1;
+          display: flex;
+          overflow: hidden;
+        }
+
+        /* ── Sidebar (desktop only) ── */
+        .sidebar {
+          display: none;
+        }
+        .sidebar-btn {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: 100%;
+          padding: 10px 16px;
+          border: none;
+          background: none;
+          color: ${T.textMuted};
+          font-size: 14px;
+          font-weight: 500;
+          border-radius: 10px;
+          transition: background 0.15s, color 0.15s;
+          text-align: left;
+        }
+        .sidebar-btn:hover { background: #252527; color: ${T.text}; }
+        .sidebar-btn.active { background: #252527; color: ${T.accent}; }
+
+        /* ── Tab bar (mobile/tablet) ── */
+        .top-tab-bar {
+          flex-shrink: 0;
+          background: ${T.card};
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+          display: flex;
+          padding: 0 20px;
+          z-index: 9;
+        }
+
+        /* ── Content area ── */
+        .content-scroll {
+          flex: 1;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+        }
+        .content-inner {
+          width: 100%;
+          max-width: 640px;
+          margin: 0 auto;
+          padding: 20px 16px 48px;
+          flex: 1;
+        }
+
+        /* ── Tablet ── */
+        @media (min-width: 640px) {
+          .content-inner {
+            max-width: 680px;
+            padding: 24px 24px 48px;
+          }
+        }
+
+        /* ── Desktop ── */
+        @media (min-width: 1024px) {
+          .app-nav { padding: 0 28px; }
+          .sidebar {
+            display: flex;
+            flex-direction: column;
+            width: 220px;
+            flex-shrink: 0;
+            background: ${T.card};
+            border-right: 1px solid rgba(255,255,255,0.06);
+            padding: 20px 12px;
+            gap: 4px;
+            overflow-y: auto;
+          }
+          .top-tab-bar { display: none; }
+          .content-inner {
+            max-width: 780px;
+            padding: 32px 40px 60px;
+          }
+        }
+
+        /* ── Wide desktop ── */
+        @media (min-width: 1400px) {
+          .sidebar { width: 260px; }
+          .content-inner { max-width: 960px; }
+        }
       `}</style>
 
       {/* Nav bar */}
-      <div style={{ background: "rgba(15,15,17,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "0 20px", height: 52, display: "flex", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
+      <div className="app-nav">
         <NavBar />
       </div>
 
-      {/* Tab bar */}
-      {!activeSong && (
-        <div style={{ background: T.card, borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", padding: "0 20px", position: "sticky", top: 52, zIndex: 9 }}>
+      <div className="app-body">
+
+        {/* Sidebar — desktop */}
+        <div className="sidebar">
           {[["songs", "Songs"], ["projects", "Projects"], ["more", "More"]].map(([key, label]) => (
-            <button key={key} style={tabBtn(tab === key)} onClick={() => { setTab(key); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); }}>
+            <button key={key}
+              className={`sidebar-btn${tab === key && !activeSong ? " active" : ""}`}
+              onClick={() => { setTab(key); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); }}>
+              {TAB_ICONS[key]}
               {label}
             </button>
           ))}
         </div>
-      )}
 
-      <div style={{ maxWidth: 640, margin: "0 auto", padding: "20px 16px 48px" }}>
+        <div className="content-scroll">
+
+          {/* Tab bar — mobile / tablet */}
+          {!activeSong && (
+            <div className="top-tab-bar">
+              {[["songs", "Songs"], ["projects", "Projects"], ["more", "More"]].map(([key, label]) => (
+                <button key={key} style={tabBtn(tab === key)} onClick={() => { setTab(key); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="content-inner">
 
         {/* Song detail */}
         {activeSong ? (
@@ -717,6 +848,8 @@ export default function SongVault() {
             )}
           </>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );
