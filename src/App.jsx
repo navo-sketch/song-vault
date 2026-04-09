@@ -711,9 +711,13 @@ export default function SongVault() {
         /* ── Content area ── */
         .content-scroll {
           flex: 1;
-          overflow-y: auto;
+          overflow: hidden;
           display: flex;
           flex-direction: column;
+        }
+        .content-main {
+          flex: 1;
+          overflow-y: auto;
         }
         .content-inner {
           width: 100%;
@@ -791,6 +795,7 @@ export default function SongVault() {
             </div>
           )}
 
+          <div className="content-main">
           <div className="content-inner">
 
         {/* Song detail */}
@@ -1063,6 +1068,7 @@ export default function SongVault() {
             )}
           </>
         )}
+          </div>
           </div>
         </div>
       </div>

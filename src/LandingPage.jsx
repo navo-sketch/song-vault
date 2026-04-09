@@ -44,8 +44,8 @@ function StatPill({ value, label }) {
 export default function LandingPage({ onGetStarted, onSignIn }) {
   return (
     <div style={{
-      minHeight: "100dvh", background: T.bg, color: T.text, fontFamily: FONT,
-      overflowY: "auto", overflowX: "hidden",
+      position: "fixed", inset: 0, background: T.bg, color: T.text,
+      fontFamily: FONT, overflowY: "auto", overflowX: "hidden",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
