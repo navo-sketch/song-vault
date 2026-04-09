@@ -282,7 +282,7 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
       {/* Notes */}
       <div style={cardStyle}>
         <div style={sectionLabel}>Notes</div>
-        <textarea value={song.notes} onChange={e => updateSong({ notes: e.target.value })}
+        <textarea value={song.notes ?? ""} onChange={e => updateSong({ notes: e.target.value })}
           placeholder="Mood, themes, references, ideas..." rows={3}
           style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 1.7, padding: 0 }} />
       </div>
@@ -290,7 +290,7 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
       {/* Lyrics */}
       <div style={cardStyle}>
         <div style={sectionLabel}>Lyrics</div>
-        <textarea value={song.lyrics} onChange={e => updateSong({ lyrics: e.target.value })}
+        <textarea value={song.lyrics ?? ""} onChange={e => updateSong({ lyrics: e.target.value })}
           placeholder="Start writing..." rows={10}
           style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 2, padding: 0 }} />
       </div>
@@ -514,7 +514,7 @@ export default function SongVault() {
     await apiSaveData(state);
     apiLogout();
     setSession(null);
-    setStateRaw({ folders: [], unassigned: [] });
+    setStateRaw({ folders: [], unassigned: [], soundcloudProfile: null });
   }
 
   function setState(updater) {
@@ -560,22 +560,27 @@ export default function SongVault() {
   const [scSending,    setScSending]    = useState(false);
   const [scError,      setScError]      = useState(null);
 
+  function normalizeScUrl(raw) { return raw.trim().replace(/^https?:\/\//i, "").replace(/\/$/, ""); }
+
   async function scSendCode() {
     if (!scInput.trim()) return;
     setScSending(true); setScError(null);
-    const res = await apiSoundCloudSendCode(scInput.trim());
+    const url = normalizeScUrl(scInput);
+    const res = await apiSoundCloudSendCode(url);
     setScSending(false);
     if (res.error) { setScError(res.error); return; }
+    setScInput(url);
     setScCodeSent(true);
   }
 
   async function scVerify() {
     if (!scCode.trim()) return;
     setScVerifying(true); setScError(null);
-    const res = await apiSoundCloudVerifyCode(scInput.trim(), scCode.trim());
+    const url = normalizeScUrl(scInput);
+    const res = await apiSoundCloudVerifyCode(url, scCode.trim());
     setScVerifying(false);
     if (res.error || !res.verified) { setScError(res.error || "Code incorrect or expired."); return; }
-    setState({ soundcloudProfile: { url: scInput.trim(), username: res.username || scInput.trim(), verified: true } });
+    setState({ soundcloudProfile: { url, username: res.username || url, verified: true } });
     setScCodeSent(false); setScCode("");
   }
 
@@ -1229,7 +1234,7 @@ export default function SongVault() {
 
                 <div style={{ marginTop: 24 }}>
                   <button
-                    onClick={() => { if (confirm("Clear ALL data? This cannot be undone.")) { setState({ folders: [], unassigned: [] }); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); } }}
+                    onClick={() => { if (confirm("Clear ALL data? This cannot be undone.")) { setState({ folders: [], unassigned: [], soundcloudProfile: null }); setScInput(""); setScCodeSent(false); setScCode(""); setScError(null); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); } }}
                     style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: T.card, fontSize: 15, color: T.danger, fontWeight: 500, boxShadow: T.shadow }}>
                     Clear All Data
                   </button>
