@@ -103,6 +103,13 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
   const [editLinkUrl, setEditLinkUrl]     = useState("");
   const fileInputRef = useRef();
 
+  const [showNewCredit,   setShowNewCredit]   = useState(false);
+  const [newCreditName,   setNewCreditName]   = useState("");
+  const [newCreditRole,   setNewCreditRole]   = useState("");
+  const [editingCreditId, setEditingCreditId] = useState(null);
+  const [editCreditName,  setEditCreditName]  = useState("");
+  const [editCreditRole,  setEditCreditRole]  = useState("");
+
   if (!song) return null;
 
   function updateSong(patch) {
@@ -131,6 +138,19 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
     setEditingLinkId(null);
   }
   function removeLink(lid) { updateSong({ links: song.links.filter(l => l.id !== lid) }); }
+
+  function addCredit() {
+    if (!newCreditName.trim()) return;
+    const credit = { id: genId(), name: newCreditName.trim(), role: newCreditRole.trim() };
+    updateSong({ credits: [...(song.credits || []), credit] });
+    setNewCreditName(""); setNewCreditRole(""); setShowNewCredit(false);
+  }
+  function saveEditCredit() {
+    if (!editCreditName.trim()) return;
+    updateSong({ credits: song.credits.map(c => c.id !== editingCreditId ? c : { ...c, name: editCreditName.trim(), role: editCreditRole.trim() }) });
+    setEditingCreditId(null);
+  }
+  function removeCredit(cid) { updateSong({ credits: song.credits.filter(c => c.id !== cid) }); }
 
   function handleFile(e) {
     Array.from(e.target.files).forEach(file => {
@@ -293,6 +313,56 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
         <button onClick={() => fileInputRef.current?.click()} style={{ background: "none", border: "none", color: T.accent, fontSize: 15, padding: 0 }}>+ Attach File</button>
       </div>
 
+      {/* Credits */}
+      <div style={cardStyle}>
+        <div style={sectionLabel}>Credits</div>
+        {(song.credits || []).map((credit, i) => (
+          <div key={credit.id}>
+            {i > 0 && <Divider />}
+            {editingCreditId === credit.id ? (
+              <div>
+                <input autoFocus value={editCreditName} onChange={e => setEditCreditName(e.target.value)} placeholder="Name"
+                  style={{ ...inputStyle, border: `1px solid ${T.accent}` }} />
+                <input value={editCreditRole} onChange={e => setEditCreditRole(e.target.value)} placeholder="Role (e.g. Producer, Vocals)"
+                  onKeyDown={e => { if (e.key === "Enter") saveEditCredit(); if (e.key === "Escape") setEditingCreditId(null); }}
+                  style={{ ...inputStyle, marginBottom: 10 }} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setEditingCreditId(null)} style={{ flex: 1, padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, fontSize: 14, color: T.text }}>Cancel</button>
+                  <button onClick={saveEditCredit} style={{ flex: 1, padding: "9px", borderRadius: 9, border: "none", background: T.accent, fontSize: 14, fontWeight: 600, color: "#fff" }}>Save</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: 15, color: T.text, fontWeight: 500 }}>{credit.name}</span>
+                  {credit.role && <span style={{ fontSize: 13, color: T.textMuted, marginLeft: 8 }}>{credit.role}</span>}
+                </div>
+                <button onClick={() => { setEditingCreditId(credit.id); setEditCreditName(credit.name); setEditCreditRole(credit.role); }}
+                  style={{ background: "none", border: "none", color: T.accent, fontSize: 13, opacity: 0.8 }}>Edit</button>
+                <button onClick={e => { e.stopPropagation(); removeCredit(credit.id); }}
+                  style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1 }}>×</button>
+              </div>
+            )}
+          </div>
+        ))}
+        {(song.credits || []).length > 0 && <Divider />}
+        {showNewCredit ? (
+          <div>
+            <input autoFocus placeholder="Name" value={newCreditName} onChange={e => setNewCreditName(e.target.value)}
+              style={inputStyle} />
+            <input placeholder="Role (e.g. Producer, Vocals)" value={newCreditRole} onChange={e => setNewCreditRole(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") addCredit(); if (e.key === "Escape") setShowNewCredit(false); }}
+              style={{ ...inputStyle, marginBottom: 10 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setShowNewCredit(false)} style={{ flex: 1, padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, fontSize: 14, color: T.text }}>Cancel</button>
+              <button onClick={addCredit} style={{ flex: 1, padding: "9px", borderRadius: 9, border: "none", background: T.accent, fontSize: 14, fontWeight: 600, color: "#fff" }}>Add</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setShowNewCredit(true)} style={{ background: "none", border: "none", color: T.accent, fontSize: 15, padding: 0 }}>+ Add Credit</button>
+        )}
+      </div>
+
       {/* Delete song */}
       <button onClick={e => { e.stopPropagation(); onDelete(song.id); }}
         style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: T.card, fontSize: 15, color: T.danger, fontWeight: 500, boxShadow: T.shadow }}>
@@ -441,7 +511,7 @@ export default function SongVault() {
 
   function createSong() {
     if (!newSongTitle.trim()) return;
-    const s = { id: genId(), title: newSongTitle.trim(), status: "idea", lyrics: "", notes: "", links: [], files: [] };
+    const s = { id: genId(), title: newSongTitle.trim(), status: "idea", lyrics: "", notes: "", links: [], files: [], credits: [] };
     if (activeFolderId) {
       setState(prev => ({ folders: prev.folders.map(f => f.id !== activeFolderId ? f : { ...f, songs: [...f.songs, s] }) }));
       setActiveSongContext(activeFolderId);
