@@ -1,0 +1,26 @@
+{
+  // ── Continue AI sidebar ──────────────────────────────────────────────────
+  "continue.enableTabAutocomplete": true,
+  "continue.showInlineTip": true,
+
+  // ── Git safety ───────────────────────────────────────────────────────────
+  "git.autofetch": true,
+  "git.confirmSync": true,
+  "git.enableSmartCommit": false,
+  "git.postCommitCommand": "none",
+
+  // ── Editor quality-of-life ───────────────────────────────────────────────
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+
+  // ── ESLint ───────────────────────────────────────────────────────────────
+  "eslint.validate": ["javascript", "javascriptreact"],
+
+  // ── Exclude noise from explorer ──────────────────────────────────────────
+  "files.exclude": {
+    "node_modules": true,
+    "dist": true
+  }
+}
