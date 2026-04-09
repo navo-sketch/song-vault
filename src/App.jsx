@@ -94,7 +94,7 @@ function AudioPlayer({ file }) {
 }
 
 // ---------- song detail view ----------
-function SongDetail({ song, folderId, folders, setFolders, onBack, onDelete }) {
+function SongDetail({ song, folderId, folders, setFolders, onBack, onDelete, onAssign }) {
   if (!song) return null;
 
   const [showNewLink, setShowNewLink] = useState(false);
@@ -187,6 +187,23 @@ function SongDetail({ song, folderId, folders, setFolders, onBack, onDelete }) {
           </button>
         ))}
       </div>
+
+      {/* Assign to project */}
+      {folderId === "unassigned" && folders.folders.length > 0 && (
+        <div style={cardStyle}>
+          <div style={sectionLabel}>Project</div>
+          <select
+            defaultValue=""
+            onChange={e => { if (e.target.value) onAssign(song.id, e.target.value); }}
+            style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 15, background: T.input, color: T.text, appearance: "none" }}
+          >
+            <option value="" disabled>Move to project...</option>
+            {folders.folders.map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Notes */}
       <div style={cardStyle}>
@@ -428,6 +445,18 @@ export default function SongVault() {
     }
     setActiveSongId(null);
     setActiveSongContext(null);
+  }
+
+  function assignSongToFolder(songId, folderId) {
+    setState(prev => {
+      const song = prev.unassigned.find(s => s.id === songId);
+      if (!song) return prev;
+      return {
+        unassigned: prev.unassigned.filter(s => s.id !== songId),
+        folders: prev.folders.map(f => f.id !== folderId ? f : { ...f, songs: [...f.songs, song] })
+      };
+    });
+    setActiveSongContext(folderId);
   }
 
   function openSong(songId, context) { setActiveSongId(songId); setActiveSongContext(context); }
@@ -683,6 +712,7 @@ export default function SongVault() {
             setFolders={setState}
             onBack={backFromSong}
             onDelete={deleteSong}
+            onAssign={assignSongToFolder}
           />
         ) : (
 
