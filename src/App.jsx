@@ -106,17 +106,22 @@ function getLinkEmbed(url) {
 }
 
 function LinkPlayer({ url }) {
-  const src = getLinkEmbed(url);
-  if (!src) return null;
+  const ytId = getYouTubeId(url);
+  if (!ytId) return null;
+  const youtubeUrl = `https://www.youtube.com/watch?v=${ytId}`;
   return (
-    <div style={{ borderRadius: 10, overflow: "hidden", marginTop: 8, background: "#000" }}>
-      <iframe
-        src={src}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-        style={{ width: "100%", height: 200, border: "none", display: "block" }}
-        title="YouTube player"
-      />
+    <div style={{ borderRadius: 10, overflow: "hidden", marginTop: 8, background: T.cardAlt, padding: "14px", border: `1px solid ${T.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          onClick={() => window.open(youtubeUrl, '_blank')}
+          style={{ width: 48, height: 48, borderRadius: 8, background: T.accent, border: "none", color: "#fff", fontSize: 20, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          ▶
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>YouTube Audio</div>
+          <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>Click to play (opens YouTube)</div>
+        </div>
+      </div>
     </div>
   );
 }
