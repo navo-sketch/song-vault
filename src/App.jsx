@@ -166,6 +166,35 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
 
   const [expandedLinkId,  setExpandedLinkId]  = useState(null);
 
+  const [aiOpen,       setAiOpen]       = useState(false);
+  const [aiType,       setAiType]       = useState("lyrics");
+  const [aiGenre,      setAiGenre]      = useState("");
+  const [aiTheme,      setAiTheme]      = useState("");
+  const [aiCount,      setAiCount]      = useState("8");
+  const [aiResult,     setAiResult]     = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError,      setAiError]      = useState(null);
+
+  async function generateStarter() {
+    setAiGenerating(true); setAiError(null); setAiResult("");
+    const genre = aiGenre.trim() || "general";
+    const theme = aiTheme.trim() || "personal experience";
+    let prompt;
+    if (aiType === "bars") {
+      prompt = `Write ${aiCount} bars of rap lyrics with strong rhyming end words (AABB or ABAB scheme). Genre: ${genre}. Theme: ${theme}. Output only the bars, no intro or explanation. Each bar on its own line.`;
+    } else {
+      prompt = `Write ${aiCount} lines of song lyrics for a ${genre} song. Theme: ${theme}. Output only the lyrics, no intro or explanation. Each line on its own line.`;
+    }
+    try {
+      const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`, { method: "GET" });
+      const text = await res.text();
+      setAiResult(text.trim());
+    } catch {
+      setAiError("Generation failed. Check your connection and try again.");
+    }
+    setAiGenerating(false);
+  }
+
   if (!song) return null;
 
   function updateSong(patch) {
@@ -311,6 +340,63 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
         <textarea value={song.notes ?? ""} onChange={e => updateSong({ notes: e.target.value })}
           placeholder="Mood, themes, references, ideas..." rows={3}
           style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 1.7, padding: 0 }} />
+      </div>
+
+      {/* AI Song Starter */}
+      <div style={cardStyle}>
+        <button onClick={() => setAiOpen(o => !o)}
+          style={{ width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 16 }}>✨</span>
+            <span style={{ ...sectionLabel, marginBottom: 0 }}>AI Song Starter</span>
+          </div>
+          <span style={{ fontSize: 13, color: T.textMuted }}>{aiOpen ? "▲" : "▼"}</span>
+        </button>
+        {aiOpen && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              {["lyrics", "bars"].map(t => (
+                <button key={t} onClick={() => setAiType(t)}
+                  style={{ flex: 1, padding: "8px", borderRadius: 9, border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer",
+                    background: aiType === t ? T.accent : T.cardAlt,
+                    color: aiType === t ? "#fff" : T.textMuted }}>
+                  {t === "bars" ? "🎤 Bars" : "🎵 Lyrics"}
+                </button>
+              ))}
+            </div>
+            <input placeholder="Genre (e.g. hip-hop, pop, R&B)" value={aiGenre} onChange={e => setAiGenre(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 14, background: T.input, color: T.text, marginBottom: 8 }} />
+            <input placeholder="Theme / topic (e.g. late nights, heartbreak)" value={aiTheme} onChange={e => setAiTheme(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 14, background: T.input, color: T.text, marginBottom: 8 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: T.textMuted, flexShrink: 0 }}>Lines:</span>
+              {["4", "8", "16"].map(n => (
+                <button key={n} onClick={() => setAiCount(n)}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", fontSize: 13, cursor: "pointer",
+                    background: aiCount === n ? T.accent : T.cardAlt,
+                    color: aiCount === n ? "#fff" : T.textMuted }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button onClick={generateStarter} disabled={aiGenerating}
+              style={{ width: "100%", padding: "10px", borderRadius: 9, border: "none", background: T.accent, color: "#fff", fontSize: 15, fontWeight: 600, opacity: aiGenerating ? 0.6 : 1, cursor: aiGenerating ? "not-allowed" : "pointer" }}>
+              {aiGenerating ? "Generating…" : "✨ Generate"}
+            </button>
+            {aiError && <div style={{ fontSize: 13, color: T.danger, marginTop: 8 }}>{aiError}</div>}
+            {aiResult && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ background: T.cardAlt, borderRadius: 9, padding: "12px 14px", border: `1px solid ${T.border}` }}>
+                  <pre style={{ fontSize: 14, color: T.text, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>{aiResult}</pre>
+                </div>
+                <button onClick={() => updateSong({ lyrics: (song.lyrics ? song.lyrics + "\n\n" : "") + aiResult })}
+                  style={{ marginTop: 10, width: "100%", padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, color: T.accent, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                  Insert into Lyrics
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Lyrics */}
