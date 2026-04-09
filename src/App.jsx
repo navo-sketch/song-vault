@@ -14,7 +14,7 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from "react";
-import { getStoredSession, apiLogout, apiGetData, apiSaveData } from "./api";
+import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers } from "./api";
 import AuthScreen from "./AuthScreen";
 
 const COLORS = ["#0A84FF", "#30D158", "#FF9F0A", "#FF375F", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A"];
@@ -408,6 +408,18 @@ export default function SongVault() {
 
   const [showNewSong,  setShowNewSong]  = useState(false);
   const [newSongTitle, setNewSongTitle] = useState("");
+
+  const [userQuery,    setUserQuery]    = useState("");
+  const [userResults,  setUserResults]  = useState(null); // null=not searched, []= no results
+  const [userSearching, setUserSearching] = useState(false);
+
+  async function searchUsers() {
+    if (!userQuery.trim()) return;
+    setUserSearching(true);
+    const res = await apiSearchUsers(userQuery.trim());
+    setUserSearching(false);
+    setUserResults(res.users ?? []);
+  }
 
   function createFolder() {
     if (!newFolderName.trim()) return;
@@ -925,6 +937,46 @@ export default function SongVault() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Find Users */}
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: T.text, marginBottom: 12 }}>Find Users</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                    <input
+                      placeholder="Search by username..."
+                      value={userQuery}
+                      onChange={e => { setUserQuery(e.target.value); setUserResults(null); }}
+                      onKeyDown={e => { if (e.key === "Enter") searchUsers(); }}
+                      style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: `1px solid ${T.border}`, fontSize: 15, background: T.input, color: T.text, outline: "none", fontFamily: "inherit" }}
+                    />
+                    <button
+                      onClick={searchUsers}
+                      disabled={userSearching || !userQuery.trim()}
+                      style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: T.accent, color: "#fff", fontSize: 15, fontWeight: 600, opacity: (userSearching || !userQuery.trim()) ? 0.5 : 1, cursor: (userSearching || !userQuery.trim()) ? "not-allowed" : "pointer" }}>
+                      {userSearching ? "…" : "Search"}
+                    </button>
+                  </div>
+                  {userResults !== null && (
+                    <div style={listCard}>
+                      {userResults.length === 0 ? (
+                        <div style={{ padding: "16px", textAlign: "center", color: T.textMuted, fontSize: 15 }}>No users found</div>
+                      ) : userResults.map((u, i) => (
+                        <div key={u.id}>
+                          {i > 0 && <div style={{ height: 1, background: T.divider, marginLeft: 54 }} />}
+                          <div style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: "50%", background: T.accent + "30", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 16, fontWeight: 700, color: T.accent }}>
+                              {(u.username || u.email)?.[0]?.toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 15, fontWeight: 500, color: T.text }}>{u.username || "—"}</div>
+                              <div style={{ fontSize: 13, color: T.textMuted }}>{u.email}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ marginTop: 24 }}>

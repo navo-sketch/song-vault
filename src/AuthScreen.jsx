@@ -61,7 +61,7 @@ export default function AuthScreen({ onAuth }) {
           <div style={{ fontSize: 40, marginBottom: 10 }}>🎵</div>
           <div style={{ fontSize: 26, fontWeight: 700, color: T.text, letterSpacing: -0.5 }}>Song Vault</div>
           <div style={{ fontSize: 14, color: T.textMuted, marginTop: 6 }}>
-            {mode === "login" ? "Sign in to your vault" : "Create your vault"}
+            {mode === "login" ? "Enter vault keys" : "Create your vault"}
           </div>
         </div>
 
