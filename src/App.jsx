@@ -16,6 +16,7 @@
 import { useState, useRef, useEffect } from "react";
 import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers } from "./api";
 import AuthScreen from "./AuthScreen";
+import LandingPage from "./LandingPage";
 
 const COLORS = ["#0A84FF", "#30D158", "#FF9F0A", "#FF375F", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A"];
 const STORAGE_KEY = "song-vault-v1";
@@ -404,6 +405,7 @@ export default function SongVault() {
   const initialSession = getStoredSession() ?? null;
   const [session,  setSession]  = useState(initialSession);
   const [loading,  setLoading]  = useState(!!initialSession);
+  const [showAuth, setShowAuth] = useState(false);
   const [state,    setStateRaw] = useState({ folders: [], unassigned: [] });
   const saveTimerRef            = useRef(null);
 
@@ -615,6 +617,7 @@ export default function SongVault() {
       <div style={{ color: "#98989D", fontSize: 15, fontFamily: "Inter, sans-serif" }}>Loading…</div>
     </div>
   );
+  if (!session && !showAuth) return <LandingPage onGetStarted={() => setShowAuth(true)} onSignIn={() => setShowAuth(true)} />;
   if (!session) return <AuthScreen onAuth={handleAuth} />;
   if (loading) return (
     <div style={{ minHeight: "100dvh", background: "#0F0F11", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12 }}>
