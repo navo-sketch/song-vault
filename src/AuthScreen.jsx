@@ -28,26 +28,16 @@ export default function AuthScreen({ onAuth }) {
     onAuth(res.user);
   }
 
-  function handleGuest() {
-    onAuth({ id: "guest", username: "Guest", isGuest: true });
-  }
-
   const inputStyle = {
     width: "100%", padding: "12px 14px", borderRadius: 10,
     border: `1px solid ${T.border}`, fontSize: 15, marginBottom: 12,
     background: T.input, color: T.text, outline: "none", fontFamily: "inherit",
   };
-  const btnPrimary = {
+  const btnStyle = {
     width: "100%", padding: "13px", borderRadius: 10, border: "none",
     background: T.accent, fontSize: 15, fontWeight: 600, color: "#fff",
     cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
     fontFamily: "inherit",
-  };
-  const btnGuest = {
-    width: "100%", padding: "12px", borderRadius: 10,
-    border: `1px solid ${T.border}`, background: "none",
-    fontSize: 14, fontWeight: 500, color: T.textMuted,
-    cursor: "pointer", fontFamily: "inherit", marginTop: 10,
   };
   const linkBtn = {
     background: "none", border: "none", color: T.accent,
@@ -65,17 +55,14 @@ export default function AuthScreen({ onAuth }) {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         input::placeholder { color: #48484A; }
         input:focus { border-color: #0A84FF !important; outline: none; }
-        .guest-btn:hover { border-color: #98989D !important; color: #F2F2F7 !important; }
       `}</style>
 
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-            <MusicNoteKeyhole size={56} color={T.accent} />
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: T.text, letterSpacing: -0.5 }}>Song Vault</div>
+          <MusicNoteKeyhole size={56} color={T.accent} />
+          <div style={{ fontSize: 26, fontWeight: 700, color: T.text, letterSpacing: -0.5, marginTop: 10 }}>LyricLab</div>
           <div style={{ fontSize: 14, color: T.textMuted, marginTop: 6 }}>
-            {mode === "login" ? "Enter vault keys" : "Create your vault"}
+            {mode === "login" ? "Sign in to your lab" : "Create your lab"}
           </div>
         </div>
 
@@ -94,12 +81,8 @@ export default function AuthScreen({ onAuth }) {
             <div style={{ fontSize: 13, color: T.danger, marginBottom: 14, textAlign: "center" }}>{error}</div>
           )}
 
-          <button type="submit" disabled={loading} style={btnPrimary}>
+          <button type="submit" disabled={loading} style={btnStyle}>
             {loading ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}
-          </button>
-
-          <button type="button" className="guest-btn" onClick={handleGuest} style={btnGuest}>
-            Continue as Guest
           </button>
 
           <div style={{ textAlign: "center", marginTop: 16, fontSize: 14, color: T.textMuted }}>
@@ -116,10 +99,6 @@ export default function AuthScreen({ onAuth }) {
             )}
           </div>
         </form>
-
-        <div style={{ textAlign: "center", marginTop: 16, fontSize: 12, color: T.textMuted }}>
-          Guest mode — your vault won&apos;t be saved between sessions
-        </div>
       </div>
     </div>
   );

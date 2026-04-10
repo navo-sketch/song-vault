@@ -1,5 +1,6 @@
 // Cloudflare Worker API client
 
+// Backend URL — Cloudflare Worker endpoint (not user-facing)
 const BASE = "https://song-vault-api.arranhathawaygallagher.workers.dev";
 
 function getToken() { return localStorage.getItem("sv_token"); }

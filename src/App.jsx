@@ -1,5 +1,5 @@
 // ============================================================
-// Song Vault — full rewrite
+// LyricLab — full rewrite
 // CHANGES vs previous version:
 //   FIX 1: delete buttons use e.stopPropagation() to prevent row clicks
 //   FIX 2: activeSongId / activeFolderId cleared immediately on delete
@@ -41,11 +41,11 @@ async function getYouTubeAudioUrl(videoId) {
 }
 
 const COLORS = ["#0A84FF", "#30D158", "#FF9F0A", "#FF375F", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A"];
-const STORAGE_KEY = "song-vault-v1";
+const STORAGE_KEY = "lyriclab-v1";
 
 function genId() { return Math.random().toString(36).slice(2, 9); }
 
-// ---------- persistence handled via Supabase (see SongVault component) ----------
+// ---------- persistence via Cloudflare Worker API ----------
 
 // ---------- dark theme palette ----------
 const T = {
@@ -335,12 +335,12 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
         </div>
       )}
 
-      {/* Notes */}
+      {/* Lyrics */}
       <div style={cardStyle}>
-        <div style={sectionLabel}>Notes</div>
-        <textarea value={song.notes ?? ""} onChange={e => updateSong({ notes: e.target.value })}
-          placeholder="Mood, themes, references, ideas..." rows={3}
-          style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 1.7, padding: 0 }} />
+        <div style={sectionLabel}>Lyrics</div>
+        <textarea value={song.lyrics ?? ""} onChange={e => updateSong({ lyrics: e.target.value })}
+          placeholder="Start writing..." rows={10}
+          style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 2, padding: 0 }} />
       </div>
 
       {/* AI Song Starter */}
@@ -400,12 +400,12 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
         )}
       </div>
 
-      {/* Lyrics */}
+      {/* Notes */}
       <div style={cardStyle}>
-        <div style={sectionLabel}>Lyrics</div>
-        <textarea value={song.lyrics ?? ""} onChange={e => updateSong({ lyrics: e.target.value })}
-          placeholder="Start writing..." rows={10}
-          style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 2, padding: 0 }} />
+        <div style={sectionLabel}>Notes</div>
+        <textarea value={song.notes ?? ""} onChange={e => updateSong({ notes: e.target.value })}
+          placeholder="Mood, themes, references, ideas..." rows={3}
+          style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 1.7, padding: 0 }} />
       </div>
 
       {/* Links */}
@@ -597,7 +597,7 @@ function SongRow({ song, folderName, folderColor, onClick }) {
 // ============================================================
 // Main app
 // ============================================================
-export default function SongVault() {
+export default function LyricLab() {
   // ── Auth + cloud sync ──
   const initialSession = getStoredSession() ?? null;
   const [session,  setSession]  = useState(initialSession);
@@ -786,7 +786,7 @@ export default function SongVault() {
       const audioFile = song.files?.find(f => f.type?.startsWith("audio/"));
       if (audioFile?.dataUrl) {
         audioUrl = audioFile.dataUrl;
-        artist = "Song Vault";
+        artist = "LyricLab";
       }
     } else if (source === "youtube") {
       const link = song.links?.find(l => getYouTubeId(l.url));
@@ -807,7 +807,7 @@ export default function SongVault() {
       navigator.mediaSession.metadata = new MediaMetadata({
         title,
         artist,
-        album: "Song Vault"
+        album: "LyricLab"
       });
       navigator.mediaSession.setActionHandler("play", () => globalAudioElement.play());
       navigator.mediaSession.setActionHandler("pause", () => globalAudioElement.pause());
@@ -851,6 +851,15 @@ export default function SongVault() {
     }
     setActiveSongId(s.id);
     setNewSongTitle(""); setShowNewSong(false);
+  }
+
+  function quickCreateSong() {
+    const s = { id: genId(), title: "Untitled", status: "idea", lyrics: "", notes: "", links: [], files: [], credits: [] };
+    setState(prev => ({ unassigned: [...prev.unassigned, s] }));
+    setTab("songs");
+    setActiveFolderId(null);
+    setActiveSongContext("unassigned");
+    setActiveSongId(s.id);
   }
 
   function archiveSong(id) {
@@ -950,7 +959,7 @@ export default function SongVault() {
       <>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <MusicNoteKeyhole size={26} color={T.accent} />
-          <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>Song Vault</span>
+          <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>LyricLab</span>
         </div>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 13, color: T.textMuted, marginRight: 10 }}>{displayName}</span>
@@ -1202,9 +1211,9 @@ export default function SongVault() {
 
                 {allSongs.length === 0 && !showNewSong && (
                   <div style={{ textAlign: "center", padding: "60px 0 30px", color: T.textMuted }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🎵</div>
-                    <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 6, color: T.textSub }}>No songs yet</div>
-                    <div style={{ fontSize: 15 }}>Tap below to add your first song</div>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>✍️</div>
+                    <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 8, color: T.textSub }}>Your lab is empty</div>
+                    <div style={{ fontSize: 15, lineHeight: 1.6 }}>That song in your head?<br />Tap <strong style={{ color: T.accent }}>+</strong> to give it a home.</div>
                   </div>
                 )}
 
@@ -1559,6 +1568,28 @@ export default function SongVault() {
           </div>
         </div>
       </div>
+
+      {/* Floating quick-create button */}
+      {!activeSong && !showNewSong && (
+        <button
+          onClick={quickCreateSong}
+          title="New song"
+          style={{
+            position: "fixed", bottom: 84, right: 20,
+            width: 56, height: 56, borderRadius: "50%",
+            background: T.accent, border: "none", color: "#fff",
+            fontSize: 28, fontWeight: 300, lineHeight: 1,
+            boxShadow: "0 4px 20px rgba(10,132,255,0.45)",
+            cursor: "pointer", zIndex: 200,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "transform 0.15s, opacity 0.15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.08)"}
+          onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }
