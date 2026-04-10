@@ -9,7 +9,7 @@ const T = {
 const cardStyle = { background: T.card, borderRadius: 14, padding: "14px 16px", marginBottom: 12, boxShadow: "0 1px 6px rgba(0,0,0,0.5)" };
 const sectionLabel = { fontSize: 11, fontWeight: 600, color: T.textMuted, letterSpacing: 0.7, textTransform: "uppercase", marginBottom: 10 };
 
-export default function AISongStarter({ song, onInsertLyrics }) {
+export default function AISongStarter({ song, onInsertLyrics, onCreateNewSong }) {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiType, setAiType] = useState("lyrics");
   const [aiGenre, setAiGenre] = useState("");
@@ -151,16 +151,34 @@ export default function AISongStarter({ song, onInsertLyrics }) {
                   {aiResult}
                 </pre>
               </div>
-              <button
-                onClick={insertResult}
-                style={{
-                  marginTop: 10, width: "100%", padding: "9px", borderRadius: 9,
-                  border: `1px solid ${T.border}`, background: T.cardAlt, color: T.accent,
-                  fontSize: 14, fontWeight: 600, cursor: "pointer"
-                }}
-              >
-                Insert into Lyrics
-              </button>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button
+                  onClick={insertResult}
+                  style={{
+                    flex: 1, padding: "9px", borderRadius: 9,
+                    border: `1px solid ${T.border}`, background: T.cardAlt, color: T.accent,
+                    fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.2s"
+                  }}
+                  onMouseEnter={e => e.target.style.background = T.border}
+                  onMouseLeave={e => e.target.style.background = T.cardAlt}
+                >
+                  Insert here
+                </button>
+                {onCreateNewSong && (
+                  <button
+                    onClick={() => onCreateNewSong(aiResult)}
+                    style={{
+                      flex: 1, padding: "9px", borderRadius: 9,
+                      border: "none", background: T.accent, color: "#fff",
+                      fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.2s"
+                    }}
+                    onMouseEnter={e => e.target.style.opacity = "0.88"}
+                    onMouseLeave={e => e.target.style.opacity = "1"}
+                  >
+                    New song with this
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

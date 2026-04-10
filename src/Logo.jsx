@@ -7,18 +7,35 @@ export default function MusicNoteKeyhole({ size = 64, color = "currentColor" }) 
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Note head / keyhole outer circle */}
-      <circle cx="22" cy="46" r="10" fill={color} />
-      {/* Keyhole slot cut into note head */}
-      <ellipse cx="22" cy="50" rx="4" ry="5.5" fill="#0F0F11" />
-      <rect x="20" y="44" width="4" height="8" fill="#0F0F11" />
-      {/* Note stem */}
-      <rect x="31" y="10" width="3" height="38" rx="1.5" fill={color} />
-      {/* Note beam / flag */}
+      {/* Modern LyricLab logo: flowing lyric waves */}
+      {/* Wave 1 - bottom, represents lyrics flowing */}
       <path
-        d="M34 10 C44 13 48 20 48 28 C44 25 38 23 34 24 Z"
-        fill={color}
+        d="M 8 40 Q 14 28 22 40 T 38 40"
+        stroke={color}
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        fill="none"
       />
+      {/* Wave 2 - middle */}
+      <path
+        d="M 6 24 Q 14 14 22 24 T 40 24"
+        stroke={color}
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      {/* Wave 3 - top, inspiration spark */}
+      <path
+        d="M 12 10 Q 18 4 24 10 T 36 10"
+        stroke={color}
+        strokeWidth="3"
+        strokeLinecap="round"
+        fill="none"
+      />
+      {/* Accent dot - the spark of creativity */}
+      <circle cx="48" cy="16" r="3.5" fill={color} opacity="0.8" />
+      {/* Small accent line */}
+      <line x1="45" y1="22" x2="51" y2="28" stroke={color} strokeWidth="2.5" strokeLinecap="round" opacity="0.7" />
     </svg>
   );
 }

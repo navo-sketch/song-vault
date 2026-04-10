@@ -18,6 +18,7 @@ import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers, a
 import AuthScreen from "./AuthScreen";
 import LandingPage from "./LandingPage";
 import AISongStarter from "./AISongStarter";
+import WritersBlockBreaker from "./WritersBlockBreaker";
 import MusicNoteKeyhole from "./Logo";
 
 // ---------- global audio player (lock screen) ----------
@@ -150,7 +151,7 @@ function LinkPlayer({ url }) {
 }
 
 // ---------- song detail view ----------
-function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, soundcloudProfile, onPlayAudio }) {
+function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, soundcloudProfile, onPlayAudio, onCreateNewSongFromAI }) {
   const [showNewLink, setShowNewLink] = useState(false);
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl]     = useState("");
@@ -352,7 +353,11 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
       </div>
 
       {/* AI Song Starter */}
-      <AISongStarter song={song} onInsertLyrics={lyrics => updateSong({ lyrics })} />
+      <AISongStarter
+        song={song}
+        onInsertLyrics={lyrics => updateSong({ lyrics })}
+        onCreateNewSong={onCreateNewSongFromAI}
+      />
 
       {/* Notes — production notes */}
       <div style={{ background: T.cardAlt, borderRadius: 16, padding: "20px 24px", marginBottom: 20, border: `1px solid ${T.border}` }}>
@@ -1166,6 +1171,21 @@ export default function LyricLab() {
             onAssign={assignSongToFolder}
             soundcloudProfile={soundcloudProfile}
             onPlayAudio={playAudio}
+            onCreateNewSongFromAI={lyrics => {
+              const newSong = {
+                id: genId(),
+                title: "Untitled",
+                status: "idea",
+                lyrics,
+                notes: "",
+                links: [],
+                files: [],
+                credits: []
+              };
+              setState(prev => ({ unassigned: [...prev.unassigned, newSong] }));
+              setActiveSongId(newSong.id);
+              setActiveSongContext("unassigned");
+            }}
           />
         ) : (
 
@@ -1173,7 +1193,25 @@ export default function LyricLab() {
             {/* ══ SONGS TAB ══ */}
             {tab === "songs" && (
               <div>
-                <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginBottom: 20, color: T.text }}>All Songs</div>
+                <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginBottom: 24, color: T.text }}>All Songs</div>
+
+                {allSongs.length > 0 && (
+                  <WritersBlockBreaker
+                    songs={allSongs}
+                    onInsertIntoSong={(songId, newLyrics) => {
+                      setState(prev => {
+                        const context = unassigned.find(s => s.id === songId) ? "unassigned" : prev.folders.find(f => f.songs.find(s => s.id === songId))?.id;
+                        if (context === "unassigned") {
+                          return { ...prev, unassigned: prev.unassigned.map(s => s.id !== songId ? s : { ...s, lyrics: (s.lyrics ? s.lyrics + "\n\n" : "") + newLyrics }) };
+                        }
+                        return {
+                          ...prev,
+                          folders: prev.folders.map(f => f.id !== context ? f : { ...f, songs: f.songs.map(s => s.id !== songId ? s : { ...s, lyrics: (s.lyrics ? s.lyrics + "\n\n" : "") + newLyrics }) })
+                        };
+                      });
+                    }}
+                  />
+                )}
 
                 {allSongs.length === 0 && !showNewSong && (
                   <div style={{ textAlign: "center", padding: "80px 0 40px", color: T.textMuted, animation: "fadeIn 0.4s ease-out" }}>
