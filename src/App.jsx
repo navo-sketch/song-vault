@@ -18,6 +18,23 @@ import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers, a
 import AuthScreen from "./AuthScreen";
 import LandingPage from "./LandingPage";
 
+// ---------- music note keyhole logo ----------
+function MusicNoteKeyhole({ size = 64, animated = false }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={animated ? { animation: "keyhole-unlock 1.8s ease-out forwards" } : {}}>
+      {/* Keyhole circle (top of note head) */}
+      <circle cx="32" cy="20" r="14" stroke="currentColor" strokeWidth="2.5"/>
+      {/* Keyhole slot (bottom opening) */}
+      <rect x="30" y="20" width="4" height="12" fill="currentColor"/>
+      {/* Music note stem */}
+      <rect x="36" y="12" width="2.5" height="36" fill="currentColor"/>
+      {/* Music note flag */}
+      <path d="M 38.5 12 Q 50 18 50 26 Q 50 30 38.5 28" fill="currentColor"/>
+    </svg>
+  );
+}
+
 // ---------- global audio player (lock screen) ----------
 const globalAudioElement = new Audio();
 globalAudioElement.crossOrigin = "anonymous";
@@ -904,7 +921,10 @@ export default function SongVault() {
     const displayName = session?.user?.username || session?.user?.email?.split("@")[0] || "Vault";
     return (
       <>
-        <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>Song Vault</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <MusicNoteKeyhole size={24} />
+          <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>Song Vault</span>
+        </div>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 13, color: T.textMuted, marginRight: 10 }}>{displayName}</span>
         <button onClick={handleLogout}
@@ -961,8 +981,13 @@ export default function SongVault() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #3A3A3C; border-radius: 3px; }
 
-        @keyframes unlock-fade { 0% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
-        .unlock-lock { animation: unlock-fade 1.8s ease-out forwards; will-change: opacity; }
+        @keyframes keyhole-unlock {
+          0% { opacity: 1; transform: scale(0.8) rotateZ(-10deg); }
+          50% { opacity: 1; transform: scale(1) rotateZ(5deg); }
+          80% { opacity: 1; }
+          100% { opacity: 0; transform: scale(0.9) rotateZ(0deg); }
+        }
+        .keyhole-icon { color: ${T.accent}; will-change: opacity, transform; }
 
         /* ── Layout shell ── */
         .app-root {
@@ -1080,9 +1105,9 @@ export default function SongVault() {
 
       {/* Unlock Animation */}
       {isUnlocking && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100vw", height: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-          <div className="unlock-lock" style={{ fontSize: 120, lineHeight: 1, animation: "unlock-fade 1.8s ease-out forwards" }}>
-            🔓
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, pointerEvents: "none" }}>
+          <div className="keyhole-icon" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <MusicNoteKeyhole size={140} animated={true} />
           </div>
         </div>
       )}
