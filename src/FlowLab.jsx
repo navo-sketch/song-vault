@@ -261,10 +261,13 @@ export default function FlowLab({ onCreateProject }) {
     <div>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, color: T.text }}>Flow Lab</div>
-        <div style={{ fontSize: 14, color: T.textMuted, marginTop: 4, lineHeight: 1.55 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.8, color: T.text }}>Flowlab</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: T.accent, letterSpacing: 0.2, opacity: 0.8 }}>by LyricLab</span>
+        </div>
+        <div style={{ fontSize: 14, color: T.textMuted, marginTop: 6, lineHeight: 1.55 }}>
           Upload a beat, detect BPM, and generate rap flow patterns.
-          Rhythm only — no lyrics.
+          Rhythm blueprints only — no lyrics.
         </div>
       </div>
 

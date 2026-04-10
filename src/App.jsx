@@ -538,13 +538,36 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
   );
 }
 
-// ---------- flat song row ----------
-function SongRow({ song, folderName, folderColor, onClick }) {
+// ---------- flat song row (draggable) ----------
+function SongRow({ song, folderName, folderColor, onClick, folderId, isDragging }) {
   const st = STATUS[song.status] || STATUS.idea;
   const audioFile = song.files?.find(f => f.type?.startsWith("audio/"));
+
+  function handleDragStart(e) {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", JSON.stringify({ songId: song.id, sourceFolderId: folderId ?? "unassigned" }));
+  }
+
   return (
-    <div className="row press" onClick={onClick}
-      style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "background 0.1s" }}>
+    <div
+      className="row press"
+      draggable
+      onDragStart={handleDragStart}
+      onClick={onClick}
+      style={{
+        padding: "13px 16px", display: "flex", alignItems: "center", gap: 12,
+        cursor: "grab", transition: "background 0.1s, opacity 0.15s",
+        opacity: isDragging ? 0.4 : 1,
+      }}
+    >
+      {/* drag handle */}
+      <div style={{ color: T.textFaint, flexShrink: 0, marginRight: -4, touchAction: "none" }}>
+        <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" opacity="0.5">
+          <circle cx="3" cy="2.5" r="1.2"/><circle cx="7" cy="2.5" r="1.2"/>
+          <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
+          <circle cx="3" cy="11.5" r="1.2"/><circle cx="7" cy="11.5" r="1.2"/>
+        </svg>
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: T.text }}>{song.title}</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -691,9 +714,6 @@ export default function LyricLab() {
   const [editFolderName,  setEditFolderName]  = useState("");
   const [editFolderColor, setEditFolderColor] = useState(COLORS[0]);
 
-  const [showNewSong,  setShowNewSong]  = useState(false);
-  const [newSongTitle, setNewSongTitle] = useState("");
-
   const [userQuery,    setUserQuery]    = useState("");
   const [userResults,  setUserResults]  = useState(null);
   const [userSearching, setUserSearching] = useState(false);
@@ -807,18 +827,12 @@ export default function LyricLab() {
     if (activeFolderId === id) { setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); }
   }
 
-  function createSong() {
-    if (!newSongTitle.trim()) return;
-    const s = { id: genId(), title: newSongTitle.trim(), status: "idea", lyrics: "", notes: "", links: [], files: [], credits: [] };
-    if (activeFolderId) {
-      setState(prev => ({ folders: prev.folders.map(f => f.id !== activeFolderId ? f : { ...f, songs: [...f.songs, s] }) }));
-      setActiveSongContext(activeFolderId);
-    } else {
-      setState(prev => ({ unassigned: [...prev.unassigned, s] }));
-      setActiveSongContext("unassigned");
-    }
+  // Create untitled song directly in a project folder, open it immediately
+  function quickCreateSongInFolder(folderId) {
+    const s = { id: genId(), title: "Untitled", status: "idea", lyrics: "", notes: "", links: [], files: [], credits: [] };
+    setState(prev => ({ folders: prev.folders.map(f => f.id !== folderId ? f : { ...f, songs: [...f.songs, s] }) }));
+    setActiveSongContext(folderId);
     setActiveSongId(s.id);
-    setNewSongTitle(""); setShowNewSong(false);
   }
 
   function quickCreateSong() {
@@ -884,6 +898,56 @@ export default function LyricLab() {
   function openSong(songId, context) { setActiveSongId(songId); setActiveSongContext(context); }
   function backFromSong() { setActiveSongId(null); setActiveSongContext(null); }
   function backFromFolder() { setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); }
+
+  // ── Drag-and-drop: move a song between sections ──
+  const [draggingSongId, setDraggingSongId] = useState(null);
+  const [dropTarget, setDropTarget]         = useState(null); // "unassigned" | folder.id
+
+  function moveSong(songId, sourceFolderId, targetFolderId) {
+    if (sourceFolderId === targetFolderId) return;
+    setState(prev => {
+      let song = null;
+      let newUnassigned = prev.unassigned;
+      let newFolders = prev.folders;
+
+      // Remove from source
+      if (sourceFolderId === "unassigned") {
+        song = prev.unassigned.find(s => s.id === songId);
+        newUnassigned = prev.unassigned.filter(s => s.id !== songId);
+      } else {
+        const srcFolder = prev.folders.find(f => f.id === sourceFolderId);
+        song = srcFolder?.songs.find(s => s.id === songId);
+        newFolders = newFolders.map(f => f.id !== sourceFolderId ? f : { ...f, songs: f.songs.filter(s => s.id !== songId) });
+      }
+      if (!song) return prev;
+
+      // Add to target
+      if (targetFolderId === "unassigned") {
+        newUnassigned = [...newUnassigned, song];
+      } else {
+        newFolders = newFolders.map(f => f.id !== targetFolderId ? f : { ...f, songs: [...f.songs, song] });
+      }
+      return { ...prev, unassigned: newUnassigned, folders: newFolders };
+    });
+    // Update active context if the dragged song was active
+    if (activeSongId === songId) setActiveSongContext(targetFolderId);
+  }
+
+  function handleSectionDrop(e, targetFolderId) {
+    e.preventDefault();
+    setDropTarget(null);
+    setDraggingSongId(null);
+    try {
+      const { songId, sourceFolderId } = JSON.parse(e.dataTransfer.getData("text/plain"));
+      moveSong(songId, sourceFolderId, targetFolderId);
+    } catch { /* ignore invalid drops */ }
+  }
+
+  function handleSectionDragOver(e, targetFolderId) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropTarget(targetFolderId);
+  }
 
   // ── Flow Lab: create a new project from flow export ──
   // Only creates a NEW project + seed song. Does not touch existing data.
@@ -1223,44 +1287,114 @@ export default function LyricLab() {
             {/* ══ SONGS TAB ══ */}
             {tab === "songs" && (
               <div>
-                <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginBottom: 24, color: T.text }}>All Songs</div>
+                <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginBottom: 20, color: T.text }}>All Songs</div>
 
+                {/* ── AI Power Tools strip ── */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 12 }}>AI Tools</div>
+                  <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
+                    {/* AI Song Starter */}
+                    <button
+                      onClick={quickCreateSong}
+                      style={{
+                        flexShrink: 0, width: 160, padding: "14px 14px 12px",
+                        borderRadius: 14, border: `1px solid #BF5AF240`,
+                        background: "linear-gradient(135deg, #BF5AF210 0%, #BF5AF205 100%)",
+                        cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = "#BF5AF2"}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = "#BF5AF240"}
+                    >
+                      <div style={{ fontSize: 22, marginBottom: 8 }}>✨</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4 }}>AI Song Starter</div>
+                      <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.5 }}>Generate lyrics or rhyming words for a new song</div>
+                    </button>
+
+                    {/* Writers Block Breaker */}
+                    <button
+                      onClick={() => document.getElementById("wbb-panel")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      style={{
+                        flexShrink: 0, width: 160, padding: "14px 14px 12px",
+                        borderRadius: 14, border: `1px solid #FF9F0A40`,
+                        background: "linear-gradient(135deg, #FF9F0A10 0%, #FF9F0A05 100%)",
+                        cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = "#FF9F0A"}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = "#FF9F0A40"}
+                    >
+                      <div style={{ fontSize: 22, marginBottom: 8 }}>⚡</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4 }}>Block Breaker</div>
+                      <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.5 }}>Unstick a verse using your existing lyrics as context</div>
+                    </button>
+
+                    {/* Flow Lab */}
+                    <button
+                      onClick={() => setTab("flowlab")}
+                      style={{
+                        flexShrink: 0, width: 160, padding: "14px 14px 12px",
+                        borderRadius: 14, border: `1px solid #0A84FF40`,
+                        background: "linear-gradient(135deg, #0A84FF10 0%, #0A84FF05 100%)",
+                        cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = T.accent}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = "#0A84FF40"}
+                    >
+                      <div style={{ fontSize: 22, marginBottom: 8 }}>🎛️</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4 }}>Flowlab</div>
+                      <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.5 }}>Detect BPM &amp; generate rap flow patterns from a beat</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Writers Block Breaker panel */}
                 {allSongs.length > 0 && (
-                  <WritersBlockBreaker
-                    songs={allSongs}
-                    onInsertIntoSong={(songId, newLyrics) => {
-                      setState(prev => {
-                        const context = unassigned.find(s => s.id === songId) ? "unassigned" : prev.folders.find(f => f.songs.find(s => s.id === songId))?.id;
-                        if (context === "unassigned") {
-                          return { ...prev, unassigned: prev.unassigned.map(s => s.id !== songId ? s : { ...s, lyrics: (s.lyrics ? s.lyrics + "\n\n" : "") + newLyrics }) };
-                        }
-                        return {
-                          ...prev,
-                          folders: prev.folders.map(f => f.id !== context ? f : { ...f, songs: f.songs.map(s => s.id !== songId ? s : { ...s, lyrics: (s.lyrics ? s.lyrics + "\n\n" : "") + newLyrics }) })
-                        };
-                      });
-                    }}
-                  />
+                  <div id="wbb-panel">
+                    <WritersBlockBreaker
+                      songs={allSongs}
+                      onInsertIntoSong={(songId, newLyrics) => {
+                        setState(prev => {
+                          const context = unassigned.find(s => s.id === songId) ? "unassigned" : prev.folders.find(f => f.songs.find(s => s.id === songId))?.id;
+                          if (context === "unassigned") {
+                            return { ...prev, unassigned: prev.unassigned.map(s => s.id !== songId ? s : { ...s, lyrics: (s.lyrics ? s.lyrics + "\n\n" : "") + newLyrics }) };
+                          }
+                          return {
+                            ...prev,
+                            folders: prev.folders.map(f => f.id !== context ? f : { ...f, songs: f.songs.map(s => s.id !== songId ? s : { ...s, lyrics: (s.lyrics ? s.lyrics + "\n\n" : "") + newLyrics }) })
+                          };
+                        });
+                      }}
+                    />
+                  </div>
                 )}
 
-                {allSongs.length === 0 && !showNewSong && (
-                  <div style={{ textAlign: "center", padding: "80px 0 40px", color: T.textMuted, animation: "fadeIn 0.4s ease-out" }}>
-                    <div style={{ fontSize: 56, marginBottom: 16, lineHeight: 1 }}>🎶</div>
-                    <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10, color: T.textSub }}>Your lab is empty</div>
-                    <div style={{ fontSize: 15, lineHeight: 1.7, maxWidth: 300, margin: "0 auto" }}>
-                      Start your first song — tap the <strong style={{ color: T.accent, fontWeight: 600 }}>+</strong> button below to create.
+                {allSongs.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "40px 0 32px", color: T.textMuted }}>
+                    <div style={{ fontSize: 52, marginBottom: 14, lineHeight: 1 }}>🎶</div>
+                    <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8, color: T.textSub }}>Your lab is empty</div>
+                    <div style={{ fontSize: 14, lineHeight: 1.7, maxWidth: 280, margin: "0 auto" }}>
+                      Tap <strong style={{ color: T.accent }}>+</strong> to start a new song — no title needed.
                     </div>
                   </div>
                 )}
 
+                {/* Unassigned drop zone */}
                 {unassigned.length > 0 && (
-                  <div style={{ marginBottom: 16 }}>
+                  <div
+                    style={{ marginBottom: 16 }}
+                    onDragOver={e => handleSectionDragOver(e, "unassigned")}
+                    onDragLeave={() => setDropTarget(null)}
+                    onDrop={e => handleSectionDrop(e, "unassigned")}
+                  >
                     <div style={{ fontSize: 13, fontWeight: 600, color: T.textMuted, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6, paddingLeft: 4 }}>Unassigned</div>
-                    <div style={listCard}>
+                    <div style={{ ...listCard, border: `1px solid ${dropTarget === "unassigned" ? T.accent : "transparent"}`, transition: "border-color 0.15s" }}>
                       {unassigned.map((song, i) => (
-                        <div key={song.id}>
+                        <div key={song.id}
+                          draggable
+                          onDragStart={() => setDraggingSongId(song.id)}
+                          onDragEnd={() => { setDraggingSongId(null); setDropTarget(null); }}
+                        >
                           {i > 0 && <div style={rowDivider} />}
-                          <SongRow song={song} folderName={null} folderColor={null} onClick={() => openSong(song.id, "unassigned")} />
+                          <SongRow song={song} folderId="unassigned" folderName={null} folderColor={null} onClick={() => openSong(song.id, "unassigned")} isDragging={draggingSongId === song.id} />
                         </div>
                       ))}
                     </div>
@@ -1268,35 +1402,48 @@ export default function LyricLab() {
                 )}
 
                 {folders.filter(f => f.songs.length > 0).map(folder => (
-                  <div key={folder.id} style={{ marginBottom: 16 }}>
+                  <div key={folder.id}
+                    style={{ marginBottom: 16 }}
+                    onDragOver={e => handleSectionDragOver(e, folder.id)}
+                    onDragLeave={() => setDropTarget(null)}
+                    onDrop={e => handleSectionDrop(e, folder.id)}
+                  >
                     <div style={{ fontSize: 13, fontWeight: 600, color: folder.color, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6, paddingLeft: 4 }}>{folder.name}</div>
-                    <div style={listCard}>
+                    <div style={{ ...listCard, border: `1px solid ${dropTarget === folder.id ? folder.color : "transparent"}`, transition: "border-color 0.15s" }}>
                       {folder.songs.map((song, i) => (
-                        <div key={song.id}>
+                        <div key={song.id}
+                          draggable
+                          onDragStart={() => setDraggingSongId(song.id)}
+                          onDragEnd={() => { setDraggingSongId(null); setDropTarget(null); }}
+                        >
                           {i > 0 && <div style={rowDivider} />}
-                          <SongRow song={song} folderName={folder.name} folderColor={folder.color} onClick={() => openSong(song.id, folder.id)} />
+                          <SongRow song={song} folderId={folder.id} folderName={folder.name} folderColor={folder.color} onClick={() => openSong(song.id, folder.id)} isDragging={draggingSongId === song.id} />
                         </div>
                       ))}
                     </div>
                   </div>
                 ))}
 
-                {showNewSong ? (
-                  <div style={formCard}>
-                    <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14, color: T.text }}>New Song</div>
-                    <input autoFocus placeholder="Song title" value={newSongTitle} onChange={e => setNewSongTitle(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") createSong(); if (e.key === "Escape") setShowNewSong(false); }}
-                      style={inputBase} />
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button onClick={() => setShowNewSong(false)} style={btnSecondary}>Cancel</button>
-                      <button onClick={createSong} style={btnPrimary()}>Add Song</button>
-                    </div>
+                {/* Drop zone for unassigned when empty */}
+                {unassigned.length === 0 && allSongs.length > 0 && (
+                  <div
+                    onDragOver={e => handleSectionDragOver(e, "unassigned")}
+                    onDragLeave={() => setDropTarget(null)}
+                    onDrop={e => handleSectionDrop(e, "unassigned")}
+                    style={{
+                      marginBottom: 16, padding: "16px", borderRadius: 12,
+                      border: `2px dashed ${dropTarget === "unassigned" ? T.accent : T.border}`,
+                      textAlign: "center", fontSize: 13, color: dropTarget === "unassigned" ? T.accent : T.textFaint,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    Drop here to unassign
                   </div>
-                ) : (
-                  <button onClick={() => { setActiveFolderId(null); setShowNewSong(true); }} className="press" style={dashedBtn()}>
-                    + New Song
-                  </button>
                 )}
+
+                <button onClick={quickCreateSong} className="press" style={dashedBtn()}>
+                  + New Song
+                </button>
 
                 {archived.length > 0 && (
                   <div style={{ marginTop: 32 }}>
@@ -1367,14 +1514,27 @@ export default function LyricLab() {
                               </div>
                             </div>
                           ) : (
-                            <div className="row press" onClick={() => setActiveFolderId(folder.id)}
-                              style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "background 0.1s" }}>
+                            <div
+                              className="row press"
+                              onClick={() => setActiveFolderId(folder.id)}
+                              onDragOver={e => handleSectionDragOver(e, folder.id)}
+                              onDragLeave={() => setDropTarget(null)}
+                              onDrop={e => { e.stopPropagation(); handleSectionDrop(e, folder.id); }}
+                              style={{
+                                padding: "13px 16px", display: "flex", alignItems: "center", gap: 12,
+                                cursor: "pointer", transition: "background 0.1s",
+                                background: dropTarget === folder.id ? folder.color + "14" : undefined,
+                              }}
+                            >
                               <div style={{ width: 34, height: 34, borderRadius: 9, background: folder.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                 <svg width="16" height="14" viewBox="0 0 16 14" fill="none"><path d="M1 2.5C1 1.95 1.45 1.5 2 1.5H5.8L7.2 3H14C14.55 3 15 3.45 15 4V11.5C15 12.05 14.55 12.5 14 12.5H2C1.45 12.5 1 12.05 1 11.5V2.5Z" fill="white" fillOpacity="0.9"/></svg>
                               </div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 16, fontWeight: 500, color: T.text }}>{folder.name}</div>
-                                <div style={{ fontSize: 13, color: T.textMuted, marginTop: 1 }}>{folder.songs.length} {folder.songs.length === 1 ? "song" : "songs"}</div>
+                                <div style={{ fontSize: 13, color: T.textMuted, marginTop: 1 }}>
+                                  {folder.songs.length} {folder.songs.length === 1 ? "song" : "songs"}
+                                  {dropTarget === folder.id && <span style={{ color: folder.color, marginLeft: 8, fontWeight: 600 }}>Drop to add →</span>}
+                                </div>
                               </div>
                               <button onClick={e => { e.stopPropagation(); setEditingFolderId(folder.id); setEditFolderName(folder.name); setEditFolderColor(folder.color); }}
                                 style={{ background: "none", border: "none", color: T.accent, fontSize: 13, padding: "0 6px", opacity: 0.8 }}>Edit</button>
@@ -1418,7 +1578,7 @@ export default function LyricLab() {
                       <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.4, color: T.text }}>{activeFolder.name}</div>
                     </div>
 
-                    {activeFolder.songs.length === 0 && !showNewSong && (
+                    {activeFolder.songs.length === 0 && (
                       <div style={{ textAlign: "center", padding: "56px 0 28px", color: T.textMuted }}>
                         <div style={{ fontSize: 44, marginBottom: 12 }}>✍️</div>
                         <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 6, color: T.textSub }}>No songs yet</div>
@@ -1435,22 +1595,9 @@ export default function LyricLab() {
                       ))}
                     </div>
 
-                    {showNewSong ? (
-                      <div style={formCard}>
-                        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14, color: T.text }}>New Song</div>
-                        <input autoFocus placeholder="Song title" value={newSongTitle} onChange={e => setNewSongTitle(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") createSong(); if (e.key === "Escape") setShowNewSong(false); }}
-                          style={inputBase} />
-                        <div style={{ display: "flex", gap: 10 }}>
-                          <button onClick={() => setShowNewSong(false)} style={btnSecondary}>Cancel</button>
-                          <button onClick={createSong} style={btnPrimary(activeFolder.color)}>Add Song</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button onClick={() => setShowNewSong(true)} className="press" style={dashedBtn(activeFolder.color)}>
-                        + New Song
-                      </button>
-                    )}
+                    <button onClick={() => quickCreateSongInFolder(activeFolderId)} className="press" style={dashedBtn(activeFolder.color)}>
+                      + New Song
+                    </button>
                   </div>
                 )}
               </div>
@@ -1611,7 +1758,7 @@ export default function LyricLab() {
       </div>
 
       {/* Floating quick-create button */}
-      {!activeSong && !showNewSong && (
+      {!activeSong && (
         <button
           onClick={quickCreateSong}
           title="New song"
