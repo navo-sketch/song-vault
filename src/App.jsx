@@ -20,6 +20,7 @@ import LandingPage from "./LandingPage";
 import AISongStarter from "./AISongStarter";
 import WritersBlockBreaker from "./WritersBlockBreaker";
 import MusicNoteKeyhole from "./Logo";
+import FlowLab from "./FlowLab";
 
 // ---------- global audio player (lock screen) ----------
 const globalAudioElement = new Audio();
@@ -884,6 +885,34 @@ export default function LyricLab() {
   function backFromSong() { setActiveSongId(null); setActiveSongContext(null); }
   function backFromFolder() { setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); }
 
+  // ── Flow Lab: create a new project from flow export ──
+  // Only creates a NEW project + seed song. Does not touch existing data.
+  function createProjectFromFlow({ title, bpm, patterns, barCount, notes }) {
+    const folderId = genId();
+    const seedSong = {
+      id: genId(),
+      title: `Flow Blueprint — ${bpm} BPM`,
+      status: "idea",
+      lyrics: "",
+      notes,
+      links: [],
+      files: [],
+      credits: [],
+    };
+    const folder = {
+      id: folderId,
+      name: title,
+      color: "#0A84FF",
+      songs: [seedSong],
+      _flowMeta: { bpm, patternCount: patterns?.length ?? 0, barCount },
+    };
+    setState(prev => ({ folders: [...prev.folders, folder] }));
+    setTab("projects");
+    setActiveFolderId(folderId);
+    setActiveSongId(seedSong.id);
+    setActiveSongContext(folderId);
+  }
+
   const allSongs = [
     ...unassigned.map(s => ({ song: s, folderId: "unassigned", folderName: null, folderColor: null })),
     ...folders.flatMap(f => f.songs.map(s => ({ song: s, folderId: f.id, folderName: f.name, folderColor: f.color })))
@@ -964,6 +993,7 @@ export default function LyricLab() {
   const TAB_ICONS = {
     songs:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
     projects: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+    flowlab:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2"/><path d="M4.93 4.93l4.24 4.24"/><path d="M14.83 9.17l4.24-4.24"/><path d="M14.83 14.83l4.24 4.24"/><path d="M9.17 14.83l-4.24 4.24"/><circle cx="12" cy="2" r="1"/><circle cx="12" cy="22" r="1"/><circle cx="2" cy="12" r="1"/><circle cx="22" cy="12" r="1"/></svg>,
     more:     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
   };
 
@@ -1134,7 +1164,7 @@ export default function LyricLab() {
 
         {/* Sidebar — desktop */}
         <div className="sidebar">
-          {[["songs", "Songs"], ["projects", "Projects"], ["more", "More"]].map(([key, label]) => (
+          {[["songs", "Songs"], ["projects", "Projects"], ["flowlab", "Flow Lab"], ["more", "More"]].map(([key, label]) => (
             <button key={key}
               className={`sidebar-btn${tab === key && !activeSong ? " active" : ""}`}
               onClick={() => { setTab(key); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); }}>
@@ -1149,7 +1179,7 @@ export default function LyricLab() {
           {/* Tab bar — mobile / tablet */}
           {!activeSong && (
             <div className="top-tab-bar">
-              {[["songs", "Songs"], ["projects", "Projects"], ["more", "More"]].map(([key, label]) => (
+              {[["songs", "Songs"], ["projects", "Projects"], ["flowlab", "Flow Lab"], ["more", "More"]].map(([key, label]) => (
                 <button key={key} style={tabBtn(tab === key)} onClick={() => { setTab(key); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); }}>
                   {label}
                 </button>
@@ -1424,6 +1454,11 @@ export default function LyricLab() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* ══ FLOW LAB TAB ══ */}
+            {tab === "flowlab" && (
+              <FlowLab onCreateProject={createProjectFromFlow} />
             )}
 
             {/* ══ MORE TAB ══ */}
