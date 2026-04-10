@@ -17,23 +17,7 @@ import { useState, useRef, useEffect } from "react";
 import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers, apiSoundCloudSendCode, apiSoundCloudVerifyCode } from "./api";
 import AuthScreen from "./AuthScreen";
 import LandingPage from "./LandingPage";
-
-// ---------- music note keyhole logo ----------
-function MusicNoteKeyhole({ size = 64, animated = false }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style={animated ? { animation: "keyhole-unlock 1.8s ease-out forwards" } : {}}>
-      {/* Keyhole circle (top of note head) */}
-      <circle cx="32" cy="20" r="14" stroke="currentColor" strokeWidth="2.5"/>
-      {/* Keyhole slot (bottom opening) */}
-      <rect x="30" y="20" width="4" height="12" fill="currentColor"/>
-      {/* Music note stem */}
-      <rect x="36" y="12" width="2.5" height="36" fill="currentColor"/>
-      {/* Music note flag */}
-      <path d="M 38.5 12 Q 50 18 50 26 Q 50 30 38.5 28" fill="currentColor"/>
-    </svg>
-  );
-}
+import MusicNoteKeyhole from "./Logo";
 
 // ---------- global audio player (lock screen) ----------
 const globalAudioElement = new Audio();
@@ -642,9 +626,9 @@ export default function SongVault() {
     }
   }, []);
 
-  // Debounced auto-save — fires 1.5s after last state change
+  // Debounced auto-save — fires 1.5s after last state change (skipped for guests)
   useEffect(() => {
-    if (!session || loading) return;
+    if (!session || loading || session.user?.isGuest) return;
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => { apiSaveData(state); }, 1500);
     return () => clearTimeout(saveTimerRef.current);
@@ -655,7 +639,8 @@ export default function SongVault() {
     setIsUnlocking(true);
     setTimeout(() => {
       setIsUnlocking(false);
-      loadData();
+      if (!user.isGuest) loadData();
+      else setLoading(false);
     }, 1800);
   }
 
@@ -922,7 +907,7 @@ export default function SongVault() {
     return (
       <>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <MusicNoteKeyhole size={24} />
+          <MusicNoteKeyhole size={26} color={T.accent} />
           <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>Song Vault</span>
         </div>
         <div style={{ flex: 1 }} />
@@ -982,12 +967,18 @@ export default function SongVault() {
         ::-webkit-scrollbar-thumb { background: #3A3A3C; border-radius: 3px; }
 
         @keyframes keyhole-unlock {
-          0% { opacity: 1; transform: scale(0.8) rotateZ(-10deg); }
-          50% { opacity: 1; transform: scale(1) rotateZ(5deg); }
-          80% { opacity: 1; }
-          100% { opacity: 0; transform: scale(0.9) rotateZ(0deg); }
+          0%   { opacity: 1; transform: scale(0.85); }
+          40%  { opacity: 1; transform: scale(1.05); }
+          75%  { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(0.95); }
         }
-        .keyhole-icon { color: ${T.accent}; will-change: opacity, transform; }
+        .keyhole-icon {
+          animation: keyhole-unlock 1.8s ease-out forwards;
+          will-change: opacity, transform;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
 
         /* ── Layout shell ── */
         .app-root {
@@ -1106,8 +1097,8 @@ export default function SongVault() {
       {/* Unlock Animation */}
       {isUnlocking && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, pointerEvents: "none" }}>
-          <div className="keyhole-icon" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <MusicNoteKeyhole size={140} animated={true} />
+          <div className="keyhole-icon">
+            <MusicNoteKeyhole size={140} color={T.accent} />
           </div>
         </div>
       )}
