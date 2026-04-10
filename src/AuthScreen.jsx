@@ -15,6 +15,7 @@ export default function AuthScreen({ onAuth }) {
   const [username, setUsername] = useState("");
   const [error, setError]       = useState(null);
   const [loading, setLoading]   = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -26,6 +27,15 @@ export default function AuthScreen({ onAuth }) {
     setLoading(false);
     if (res.error) { setError(res.error); return; }
     onAuth(res.user);
+  }
+
+  function switchMode(newMode) {
+    setIsTransitioning(true);
+    setError(null);
+    setTimeout(() => {
+      setMode(newMode);
+      setIsTransitioning(false);
+    }, 150);
   }
 
   const inputStyle = {
@@ -55,50 +65,65 @@ export default function AuthScreen({ onAuth }) {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         input::placeholder { color: #48484A; }
         input:focus { border-color: #0A84FF !important; outline: none; }
+        input { transition: border-color 0.2s; }
+        button { transition: all 0.2s; }
+        .auth-form { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .fading { opacity: 0; }
       `}</style>
 
       <div style={{ width: "100%", maxWidth: 380 }}>
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div style={{ textAlign: "center", marginBottom: 32, animation: "slideUp 0.4s ease-out" }}>
           <MusicNoteKeyhole size={56} color={T.accent} />
-          <div style={{ fontSize: 26, fontWeight: 700, color: T.text, letterSpacing: -0.5, marginTop: 10 }}>LyricLab</div>
-          <div style={{ fontSize: 14, color: T.textMuted, marginTop: 6 }}>
-            {mode === "login" ? "Sign in to your lab" : "Create your lab"}
+          <div style={{ fontSize: 28, fontWeight: 800, color: T.text, letterSpacing: -0.7, marginTop: 14 }}>LyricLab</div>
+          <div style={{ fontSize: 14, color: T.textMuted, marginTop: 8 }}>
+            {mode === "login" ? "Sign in and keep writing" : "Create your songwriting lab"}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ background: T.card, borderRadius: 16, padding: 24 }}>
+        <form onSubmit={handleSubmit} className={isTransitioning ? "fading" : "auth-form"} style={{ background: T.card, borderRadius: 16, padding: 24, transition: "opacity 0.15s" }}>
           {mode === "signup" && (
             <input type="text" placeholder="Display name (optional)"
               value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} />
           )}
-          <input type="email" placeholder="Email" required
+          <input type="email" placeholder="Email" autoFocus required
             value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
           <input type="password" placeholder="Password" required minLength={6}
             value={password} onChange={e => setPassword(e.target.value)}
             style={{ ...inputStyle, marginBottom: error ? 10 : 16 }} />
 
           {error && (
-            <div style={{ fontSize: 13, color: T.danger, marginBottom: 14, textAlign: "center" }}>{error}</div>
+            <div style={{ fontSize: 13, color: T.danger, marginBottom: 14, textAlign: "center", animation: "slideUp 0.2s ease-out" }}>{error}</div>
           )}
 
-          <button type="submit" disabled={loading} style={btnStyle}>
-            {loading ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}
+          <button type="submit" disabled={loading} style={{...btnStyle, cursor: loading ? "not-allowed" : "pointer"}}>
+            {loading ? "Loading…" : mode === "login" ? "Sign In" : "Create Account"}
           </button>
 
           <div style={{ textAlign: "center", marginTop: 16, fontSize: 14, color: T.textMuted }}>
             {mode === "login" ? (
               <>No account?{" "}
-                <button type="button" onClick={() => { setMode("signup"); setError(null); }} style={linkBtn}>
-                  Sign up free
+                <button type="button" onClick={() => switchMode("signup")} style={linkBtn}>
+                  Create one free
                 </button></>
             ) : (
               <>Already have an account?{" "}
-                <button type="button" onClick={() => { setMode("login"); setError(null); }} style={linkBtn}>
+                <button type="button" onClick={() => switchMode("login")} style={linkBtn}>
                   Sign in
                 </button></>
             )}
           </div>
         </form>
+
+        <button onClick={() => onAuth({ id: "guest", username: "Guest", isGuest: true })} style={{
+          width: "100%", marginTop: 12, padding: "12px", borderRadius: 10,
+          border: `1px solid ${T.border}`, background: "none",
+          fontSize: 14, fontWeight: 500, color: T.textMuted,
+          cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s"
+        }} onMouseEnter={e => { e.target.style.borderColor = T.textMuted; e.target.style.color = T.text; }}
+           onMouseLeave={e => { e.target.style.borderColor = T.border; e.target.style.color = T.textMuted; }}>
+          Continue as Guest
+        </button>
       </div>
     </div>
   );

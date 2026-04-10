@@ -1023,6 +1023,8 @@ export default function LyricLab() {
           75%  { opacity: 1; transform: scale(1); }
           100% { opacity: 0; transform: scale(0.95); }
         }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         .keyhole-icon {
           animation: keyhole-unlock 1.8s ease-out forwards;
           will-change: opacity, transform;
@@ -1030,6 +1032,8 @@ export default function LyricLab() {
           align-items: center;
           justify-content: center;
         }
+        * { transition: background-color 0.2s, color 0.2s, border-color 0.2s; }
+        button { transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
         /* ── Layout shell ── */
         .app-root {
@@ -1210,10 +1214,12 @@ export default function LyricLab() {
                 <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginBottom: 20, color: T.text }}>All Songs</div>
 
                 {allSongs.length === 0 && !showNewSong && (
-                  <div style={{ textAlign: "center", padding: "60px 0 30px", color: T.textMuted }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>✍️</div>
-                    <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 8, color: T.textSub }}>Your lab is empty</div>
-                    <div style={{ fontSize: 15, lineHeight: 1.6 }}>That song in your head?<br />Tap <strong style={{ color: T.accent }}>+</strong> to give it a home.</div>
+                  <div style={{ textAlign: "center", padding: "80px 0 40px", color: T.textMuted, animation: "fadeIn 0.4s ease-out" }}>
+                    <div style={{ fontSize: 56, marginBottom: 16, lineHeight: 1 }}>🎶</div>
+                    <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10, color: T.textSub }}>Your lab is empty</div>
+                    <div style={{ fontSize: 15, lineHeight: 1.7, maxWidth: 300, margin: "0 auto" }}>
+                      Start your first song — tap the <strong style={{ color: T.accent, fontWeight: 600 }}>+</strong> button below to create.
+                    </div>
                   </div>
                 )}
 

@@ -57,23 +57,25 @@ export default function LandingPage({ onGetStarted, onSignIn }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         .lp-btn-primary {
           background: #0A84FF; color: #fff; border: none; border-radius: 12px;
           font-size: 16px; font-weight: 600; padding: 14px 32px; cursor: pointer;
-          font-family: inherit; transition: opacity 0.15s, transform 0.1s;
+          font-family: inherit; transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .lp-btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+        .lp-btn-primary:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(10,132,255,0.35); }
         .lp-btn-ghost {
           background: none; color: #98989D; border: 1px solid #3A3A3C; border-radius: 12px;
           font-size: 16px; font-weight: 500; padding: 14px 32px; cursor: pointer;
-          font-family: inherit; transition: color 0.15s, border-color 0.15s;
+          font-family: inherit; transition: all 0.2s;
         }
-        .lp-btn-ghost:hover { color: #F2F2F7; border-color: #98989D; }
+        .lp-btn-ghost:hover { color: #F2F2F7; border-color: #98989D; transform: translateY(-2px); }
         .lp-tag {
           display: inline-flex; align-items: center; gap: 6px;
           background: #0A84FF18; color: #0A84FF; border: 1px solid #0A84FF40;
           border-radius: 20px; font-size: 12px; font-weight: 600;
           padding: 5px 12px; letter-spacing: 0.3px; text-transform: uppercase;
+          animation: slideUp 0.5s ease-out;
         }
       `}</style>
 
@@ -102,37 +104,36 @@ export default function LandingPage({ onGetStarted, onSignIn }) {
           ✍️ Made for songwriters
         </div>
         <h1 style={{
-          fontSize: "clamp(38px, 8vw, 66px)", fontWeight: 800, letterSpacing: -2.5,
-          color: T.text, lineHeight: 1.05, marginBottom: 24,
+          fontSize: "clamp(40px, 9vw, 72px)", fontWeight: 800, letterSpacing: -2.5,
+          color: T.text, lineHeight: 1.05, marginBottom: 24, animation: "slideUp 0.5s ease-out",
         }}>
-          Write more.{" "}
+          Your lyrics.{" "}
           <span style={{
-            background: "linear-gradient(135deg, #0A84FF 20%, #BF5AF2 80%)",
+            background: "linear-gradient(135deg, #0A84FF 0%, #BF5AF2 50%, #30D158 100%)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>
-            Lose nothing.
+            Organized. Inspired. Done.
           </span>
         </h1>
         <p style={{
-          fontSize: 18, color: T.textMuted, lineHeight: 1.75, marginBottom: 40,
-          maxWidth: 500, margin: "0 auto 40px",
+          fontSize: 18, color: T.textMuted, lineHeight: 1.8, marginBottom: 40,
+          maxWidth: 550, margin: "0 auto 40px", animation: "slideUp 0.6s ease-out 0.1s both",
         }}>
-          The place where song ideas live, grow, and get finished.
-          Lyrics, notes, references, AI starters — everything in one place,
-          synced to the cloud so you never lose a spark.
+          LyricLab is your creative studio. Write lyrics, organize projects, get AI suggestions, and ship songs —
+          all in one place. Your lyrics stay yours forever.
         </p>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", animation: "slideUp 0.7s ease-out 0.2s both" }}>
           <button className="lp-btn-primary" onClick={onGetStarted}
-            style={{ fontSize: 16, padding: "15px 36px" }}>
-            Open Your Vault Free
+            style={{ fontSize: 16, padding: "15px 40px", fontWeight: 700 }}>
+            Start Free →
           </button>
           <button className="lp-btn-ghost" onClick={onSignIn}
-            style={{ fontSize: 16, padding: "15px 36px" }}>
+            style={{ fontSize: 16, padding: "15px 40px", fontWeight: 600 }}>
             Sign In
           </button>
         </div>
-        <div style={{ marginTop: 18, fontSize: 13, color: T.textFaint }}>
-          No credit card · No installs · Works on every device
+        <div style={{ marginTop: 20, fontSize: 12, color: T.textFaint, letterSpacing: 0.3 }}>
+          FREE · NO CREDIT CARD · CLOUD SYNCED
         </div>
       </section>
 
