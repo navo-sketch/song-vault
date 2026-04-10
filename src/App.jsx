@@ -17,6 +17,8 @@ import { useState, useRef, useEffect } from "react";
 import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers, apiSoundCloudSendCode, apiSoundCloudVerifyCode } from "./api";
 import AuthScreen from "./AuthScreen";
 import LandingPage from "./LandingPage";
+import AISongStarter from "./AISongStarter";
+import WritersBlockBreaker from "./WritersBlockBreaker";
 import MusicNoteKeyhole from "./Logo";
 
 // ---------- global audio player (lock screen) ----------
@@ -149,7 +151,7 @@ function LinkPlayer({ url }) {
 }
 
 // ---------- song detail view ----------
-function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, soundcloudProfile, onPlayAudio }) {
+function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, soundcloudProfile, onPlayAudio, onCreateNewSongFromAI }) {
   const [showNewLink, setShowNewLink] = useState(false);
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl]     = useState("");
@@ -166,35 +168,6 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
   const [editCreditRole,  setEditCreditRole]  = useState("");
 
   const [expandedLinkId,  setExpandedLinkId]  = useState(null);
-
-  const [aiOpen,       setAiOpen]       = useState(false);
-  const [aiType,       setAiType]       = useState("lyrics");
-  const [aiGenre,      setAiGenre]      = useState("");
-  const [aiTheme,      setAiTheme]      = useState("");
-  const [aiCount,      setAiCount]      = useState("8");
-  const [aiResult,     setAiResult]     = useState("");
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiError,      setAiError]      = useState(null);
-
-  async function generateStarter() {
-    setAiGenerating(true); setAiError(null); setAiResult("");
-    const genre = aiGenre.trim() || "general";
-    const theme = aiTheme.trim() || "personal experience";
-    let prompt;
-    if (aiType === "endwords") {
-      prompt = `Generate ${aiCount} sets of rhyming ending words for rap bars. Genre: ${genre}. Theme: ${theme}. Format: each line should be a single rhyming word only — no full sentences, no explanations. Group into rhyme pairs or sets of 4. Output only the words, one per line.`;
-    } else {
-      prompt = `Write ${aiCount} lines of song lyrics for a ${genre} song. Theme: ${theme}. Output only the lyrics, no intro or explanation. Each line on its own line.`;
-    }
-    try {
-      const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`, { method: "GET" });
-      const text = await res.text();
-      setAiResult(text.trim());
-    } catch {
-      setAiError("Generation failed. Check your connection and try again.");
-    }
-    setAiGenerating(false);
-  }
 
   if (!song) return null;
 
@@ -267,13 +240,19 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
 
   return (
     <div>
-      {/* Title */}
+      {/* Title — big, bold hero */}
       <input
         value={song.title}
         onChange={e => updateSong({ title: e.target.value })}
-        style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.4, background: "none", border: "none", borderBottom: `2px solid transparent`, width: "100%", marginBottom: 12, color: T.text, padding: "2px 0" }}
+        placeholder="Untitled Song"
+        style={{
+          fontSize: 40, fontWeight: 800, letterSpacing: -1.2,
+          background: "none", border: "none", borderBottom: `3px solid ${T.border}`,
+          width: "100%", marginBottom: 24, color: T.text, padding: "8px 0",
+          outline: "none", transition: "border-color 0.2s"
+        }}
         onFocus={e => e.target.style.borderBottomColor = T.accent}
-        onBlur={e => e.target.style.borderBottomColor = "transparent"}
+        onBlur={e => e.target.style.borderBottomColor = T.border}
       />
 
       {audioFile && (
@@ -282,16 +261,37 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
         </div>
       )}
 
-      {/* Status pills */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        {Object.entries(STATUS).map(([key, val]) => (
-          <button key={key} onClick={() => updateSong({ status: key })} className="press"
-            style={{ padding: "6px 16px", borderRadius: 20, border: "none", fontSize: 14, fontWeight: 500,
-              background: song.status === key ? val.color : T.cardAlt,
-              color: song.status === key ? "#fff" : T.textMuted, transition: "all 0.15s" }}>
-            {val.label}
-          </button>
-        ))}
+      {/* Status pills — workflow indicator */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 32, alignItems: "center" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: T.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>Status</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          {Object.entries(STATUS).map(([key, val]) => (
+            <button
+              key={key}
+              onClick={() => updateSong({ status: key })}
+              style={{
+                padding: "8px 18px", borderRadius: 24, border: "none", fontSize: 13, fontWeight: 600,
+                background: song.status === key ? val.color : T.cardAlt,
+                color: song.status === key ? "#fff" : T.textMuted,
+                cursor: "pointer", transition: "all 0.2s"
+              }}
+              onMouseEnter={e => {
+                if (song.status !== key) {
+                  e.target.style.background = T.border;
+                  e.target.style.color = T.text;
+                }
+              }}
+              onMouseLeave={e => {
+                if (song.status !== key) {
+                  e.target.style.background = T.cardAlt;
+                  e.target.style.color = T.textMuted;
+                }
+              }}
+            >
+              {val.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Release ready */}
@@ -335,82 +335,49 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, s
         </div>
       )}
 
-      {/* Lyrics */}
-      <div style={cardStyle}>
-        <div style={sectionLabel}>Lyrics</div>
-        <textarea value={song.lyrics ?? ""} onChange={e => updateSong({ lyrics: e.target.value })}
-          placeholder="Start writing..." rows={10}
-          style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 2, padding: 0 }} />
+      {/* Lyrics — main writing surface */}
+      <div style={{ background: T.card, borderRadius: 18, padding: "24px 28px", marginBottom: 20, boxShadow: "0 2px 8px rgba(0,0,0,0.3)", border: `1px solid ${T.border}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.accent, letterSpacing: 0.7, textTransform: "uppercase", marginBottom: 14 }}>Lyrics</div>
+        <textarea
+          value={song.lyrics ?? ""}
+          onChange={e => updateSong({ lyrics: e.target.value })}
+          placeholder="Write your lyrics here…"
+          rows={16}
+          style={{
+            width: "100%", border: "none", background: "none",
+            fontSize: 16, color: T.text, resize: "none",
+            lineHeight: 1.9, padding: 0, outline: "none",
+            fontFamily: "'Courier New', monospace"
+          }}
+        />
       </div>
 
       {/* AI Song Starter */}
-      <div style={cardStyle}>
-        <button onClick={() => setAiOpen(o => !o)}
-          style={{ width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 16 }}>✨</span>
-            <span style={{ ...sectionLabel, marginBottom: 0 }}>AI Song Starter</span>
-          </div>
-          <span style={{ fontSize: 13, color: T.textMuted }}>{aiOpen ? "▲" : "▼"}</span>
-        </button>
-        {aiOpen && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              {["lyrics", "endwords"].map(t => (
-                <button key={t} onClick={() => setAiType(t)}
-                  style={{ flex: 1, padding: "8px", borderRadius: 9, border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer",
-                    background: aiType === t ? T.accent : T.cardAlt,
-                    color: aiType === t ? "#fff" : T.textMuted }}>
-                  {t === "endwords" ? "🎤 Ending Words" : "🎵 Lyrics"}
-                </button>
-              ))}
-            </div>
-            <input placeholder="Genre (e.g. hip-hop, pop, R&B)" value={aiGenre} onChange={e => setAiGenre(e.target.value)}
-              style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 14, background: T.input, color: T.text, marginBottom: 8 }} />
-            <input placeholder="Theme / topic (e.g. late nights, heartbreak)" value={aiTheme} onChange={e => setAiTheme(e.target.value)}
-              style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 14, background: T.input, color: T.text, marginBottom: 8 }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <span style={{ fontSize: 13, color: T.textMuted, flexShrink: 0 }}>Lines:</span>
-              {["4", "8", "16"].map(n => (
-                <button key={n} onClick={() => setAiCount(n)}
-                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", fontSize: 13, cursor: "pointer",
-                    background: aiCount === n ? T.accent : T.cardAlt,
-                    color: aiCount === n ? "#fff" : T.textMuted }}>
-                  {n}
-                </button>
-              ))}
-            </div>
-            <button onClick={generateStarter} disabled={aiGenerating}
-              style={{ width: "100%", padding: "10px", borderRadius: 9, border: "none", background: T.accent, color: "#fff", fontSize: 15, fontWeight: 600, opacity: aiGenerating ? 0.6 : 1, cursor: aiGenerating ? "not-allowed" : "pointer" }}>
-              {aiGenerating ? "Generating…" : "✨ Generate"}
-            </button>
-            {aiError && <div style={{ fontSize: 13, color: T.danger, marginTop: 8 }}>{aiError}</div>}
-            {aiResult && (
-              <div style={{ marginTop: 14 }}>
-                <div style={{ background: T.cardAlt, borderRadius: 9, padding: "12px 14px", border: `1px solid ${T.border}` }}>
-                  <pre style={{ fontSize: 14, color: T.text, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>{aiResult}</pre>
-                </div>
-                <button onClick={() => updateSong({ lyrics: (song.lyrics ? song.lyrics + "\n\n" : "") + aiResult })}
-                  style={{ marginTop: 10, width: "100%", padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, color: T.accent, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-                  Insert into Lyrics
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+      <AISongStarter
+        song={song}
+        onInsertLyrics={lyrics => updateSong({ lyrics })}
+        onCreateNewSong={onCreateNewSongFromAI}
+      />
+
+      {/* Notes — production notes */}
+      <div style={{ background: T.cardAlt, borderRadius: 16, padding: "20px 24px", marginBottom: 20, border: `1px solid ${T.border}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.orange, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 12 }}>Production Notes</div>
+        <textarea
+          value={song.notes ?? ""}
+          onChange={e => updateSong({ notes: e.target.value })}
+          placeholder="Tempo, key, ideas, mood, references…"
+          rows={4}
+          style={{
+            width: "100%", border: "none", background: "none",
+            fontSize: 14, color: T.textMuted, resize: "none",
+            lineHeight: 1.6, padding: 0, outline: "none"
+          }}
+        />
       </div>
 
-      {/* Notes */}
-      <div style={cardStyle}>
-        <div style={sectionLabel}>Notes</div>
-        <textarea value={song.notes ?? ""} onChange={e => updateSong({ notes: e.target.value })}
-          placeholder="Mood, themes, references, ideas..." rows={3}
-          style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 1.7, padding: 0 }} />
-      </div>
-
-      {/* Links */}
-      <div style={cardStyle}>
-        <div style={sectionLabel}>Links</div>
+      {/* Links — references & inspiration */}
+      <div style={{ background: T.card, borderRadius: 16, padding: "20px 24px", marginBottom: 20, border: `1px solid ${T.border}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: T.green, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 14 }}>References</div>
         {song.links?.map((link, i) => {
           const embed = getLinkEmbed(link.url);
           const isExpanded = expandedLinkId === link.id;
@@ -1023,6 +990,8 @@ export default function LyricLab() {
           75%  { opacity: 1; transform: scale(1); }
           100% { opacity: 0; transform: scale(0.95); }
         }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         .keyhole-icon {
           animation: keyhole-unlock 1.8s ease-out forwards;
           will-change: opacity, transform;
@@ -1030,6 +999,8 @@ export default function LyricLab() {
           align-items: center;
           justify-content: center;
         }
+        * { transition: background-color 0.2s, color 0.2s, border-color 0.2s; }
+        button { transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
         /* ── Layout shell ── */
         .app-root {
@@ -1200,6 +1171,21 @@ export default function LyricLab() {
             onAssign={assignSongToFolder}
             soundcloudProfile={soundcloudProfile}
             onPlayAudio={playAudio}
+            onCreateNewSongFromAI={lyrics => {
+              const newSong = {
+                id: genId(),
+                title: "Untitled",
+                status: "idea",
+                lyrics,
+                notes: "",
+                links: [],
+                files: [],
+                credits: []
+              };
+              setState(prev => ({ unassigned: [...prev.unassigned, newSong] }));
+              setActiveSongId(newSong.id);
+              setActiveSongContext("unassigned");
+            }}
           />
         ) : (
 
@@ -1207,13 +1193,33 @@ export default function LyricLab() {
             {/* ══ SONGS TAB ══ */}
             {tab === "songs" && (
               <div>
-                <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginBottom: 20, color: T.text }}>All Songs</div>
+                <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginBottom: 24, color: T.text }}>All Songs</div>
+
+                {allSongs.length > 0 && (
+                  <WritersBlockBreaker
+                    songs={allSongs}
+                    onInsertIntoSong={(songId, newLyrics) => {
+                      setState(prev => {
+                        const context = unassigned.find(s => s.id === songId) ? "unassigned" : prev.folders.find(f => f.songs.find(s => s.id === songId))?.id;
+                        if (context === "unassigned") {
+                          return { ...prev, unassigned: prev.unassigned.map(s => s.id !== songId ? s : { ...s, lyrics: (s.lyrics ? s.lyrics + "\n\n" : "") + newLyrics }) };
+                        }
+                        return {
+                          ...prev,
+                          folders: prev.folders.map(f => f.id !== context ? f : { ...f, songs: f.songs.map(s => s.id !== songId ? s : { ...s, lyrics: (s.lyrics ? s.lyrics + "\n\n" : "") + newLyrics }) })
+                        };
+                      });
+                    }}
+                  />
+                )}
 
                 {allSongs.length === 0 && !showNewSong && (
-                  <div style={{ textAlign: "center", padding: "60px 0 30px", color: T.textMuted }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>✍️</div>
-                    <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 8, color: T.textSub }}>Your lab is empty</div>
-                    <div style={{ fontSize: 15, lineHeight: 1.6 }}>That song in your head?<br />Tap <strong style={{ color: T.accent }}>+</strong> to give it a home.</div>
+                  <div style={{ textAlign: "center", padding: "80px 0 40px", color: T.textMuted, animation: "fadeIn 0.4s ease-out" }}>
+                    <div style={{ fontSize: 56, marginBottom: 16, lineHeight: 1 }}>🎶</div>
+                    <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10, color: T.textSub }}>Your lab is empty</div>
+                    <div style={{ fontSize: 15, lineHeight: 1.7, maxWidth: 300, margin: "0 auto" }}>
+                      Start your first song — tap the <strong style={{ color: T.accent, fontWeight: 600 }}>+</strong> button below to create.
+                    </div>
                   </div>
                 )}
 

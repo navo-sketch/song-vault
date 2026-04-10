@@ -1,0 +1,73 @@
+{
+  "name": "Song Vault",
+  "version": "1.0.0",
+  "models": [
+    {
+      "title": "Ollama – CodeLlama 7B (local)",
+      "provider": "ollama",
+      "model": "codellama:7b",
+      "apiBase": "http://localhost:11434",
+      "contextLength": 4096,
+      "useLegacyCompletionsEndpoint": false
+    },
+    {
+      "title": "GPT4All – local server",
+      "provider": "openai",
+      "model": "mistral-7b-instruct",
+      "apiBase": "http://localhost:4891/v1",
+      "apiKey": "any",
+      "contextLength": 4096
+    }
+  ],
+
+  "tabAutocompleteModel": {
+    "title": "Ollama – StarCoder2 3B",
+    "provider": "ollama",
+    "model": "starcoder2:3b",
+    "apiBase": "http://localhost:11434"
+  },
+
+  "embeddingsProvider": {
+    "provider": "ollama",
+    "model": "nomic-embed-text",
+    "apiBase": "http://localhost:11434"
+  },
+
+  "contextProviders": [
+    { "name": "code", "params": {} },
+    { "name": "docs", "params": {} },
+    { "name": "diff", "params": {} },
+    { "name": "terminal", "params": {} },
+    { "name": "problems", "params": {} },
+    { "name": "folder", "params": {} },
+    { "name": "codebase", "params": {} }
+  ],
+
+  "slashCommands": [
+    {
+      "name": "edit",
+      "description": "Edit selected code"
+    },
+    {
+      "name": "comment",
+      "description": "Add comments to selected code"
+    },
+    {
+      "name": "share",
+      "description": "Export conversation"
+    },
+    {
+      "name": "cmd",
+      "description": "Generate a terminal command"
+    }
+  ],
+
+  "rules": [
+    "This is Song Vault — a React 19 + Vite SPA. No TypeScript, no router.",
+    "State lives in App.jsx. Vault shape: { folders: [], unassigned: [], soundcloudProfile: null }.",
+    "Theme colours are in the T object. Do NOT invent new colour keys — check T first.",
+    "All hooks must be called before any early return (react-hooks/rules-of-hooks).",
+    "Never add features beyond what is asked. Keep changes minimal.",
+    "Run `npm run lint` before flagging code as done."
+  ]
+}
