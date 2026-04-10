@@ -639,7 +639,7 @@ export default function SongVault() {
     setTimeout(() => {
       setIsUnlocking(false);
       loadData();
-    }, 1200);
+    }, 1800);
   }
 
   async function handleLogout() {
@@ -961,9 +961,8 @@ export default function SongVault() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #3A3A3C; border-radius: 3px; }
 
-        @keyframes unlock-spin { 0% { transform: rotateZ(0deg); } 50% { transform: rotateZ(-15deg); } 100% { transform: rotateZ(0deg); } }
-        @keyframes unlock-fade { 0% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: scale(0.8); } }
-        .unlock-lock { animation: unlock-spin 0.6s ease-in-out, unlock-fade 1.2s ease-out forwards; }
+        @keyframes unlock-fade { 0% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+        .unlock-lock { animation: unlock-fade 1.8s ease-out forwards; will-change: opacity; }
 
         /* ── Layout shell ── */
         .app-root {
@@ -1081,8 +1080,8 @@ export default function SongVault() {
 
       {/* Unlock Animation */}
       {isUnlocking && (
-        <div style={{ position: "fixed", inset: 0, background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div className="unlock-lock" style={{ fontSize: 80, animation: "unlock-spin 0.6s ease-in-out, unlock-fade 1.2s ease-out forwards" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100vw", height: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+          <div className="unlock-lock" style={{ fontSize: 120, lineHeight: 1, animation: "unlock-fade 1.8s ease-out forwards" }}>
             🔓
           </div>
         </div>
