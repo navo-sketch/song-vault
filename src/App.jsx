@@ -605,15 +605,48 @@ export default function SongVault() {
   const [showAuth, setShowAuth] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [state,    setStateRaw] = useState({ folders: [], unassigned: [], archived: [], soundcloudProfile: null });
-  const saveTimerRef            = useRef(null);
+  const saveTimerRef   = useRef(null);
+  const hasLoadedData  = useRef(false);   // never auto-save until at least one real load
+  const BACKUP_KEY     = "sv_local_backup";
 
   function hydrateState(data) {
-    setStateRaw({ folders: data.folders ?? [], unassigned: data.unassigned ?? [], archived: data.archived ?? [], soundcloudProfile: data.soundcloudProfile ?? null });
+    const safe = {
+      folders:          data.folders          ?? [],
+      unassigned:       data.unassigned       ?? [],
+      archived:         data.archived         ?? [],
+      soundcloudProfile: data.soundcloudProfile ?? null,
+    };
+    setStateRaw(safe);
+    hasLoadedData.current = true;
+    // Mirror every successful load to localStorage as a local backup
+    try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ ...safe, _savedAt: Date.now() })); } catch (e) { void e; }
+  }
+
+  function countSongs(s) {
+    return (s.unassigned?.length ?? 0) +
+           (s.folders?.reduce((n, f) => n + (f.songs?.length ?? 0), 0) ?? 0);
   }
 
   async function loadData() {
-    const res = await apiGetData();
-    if (res.data) hydrateState(res.data);
+    try {
+      const res = await apiGetData();
+      if (res.data) {
+        hydrateState(res.data);
+      } else {
+        // Cloud returned nothing — fall back to local backup silently
+        const raw = localStorage.getItem(BACKUP_KEY);
+        if (raw) {
+          const backup = JSON.parse(raw);
+          hydrateState(backup);
+          // Push backup back up to the server so it's there next time
+          await apiSaveData(backup);
+        }
+      }
+    } catch {
+      // Network error — try local backup
+      const raw = localStorage.getItem(BACKUP_KEY);
+      if (raw) { try { hydrateState(JSON.parse(raw)); } catch (e) { void e; } }
+    }
     setLoading(false);
   }
 
@@ -626,11 +659,18 @@ export default function SongVault() {
     }
   }, []);
 
-  // Debounced auto-save — fires 1.5s after last state change (skipped for guests)
+  // Debounced auto-save — only fires after real data has been loaded at least once
   useEffect(() => {
-    if (!session || loading || session.user?.isGuest) return;
+    if (!session || loading || session.user?.isGuest || !hasLoadedData.current) return;
     clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => { apiSaveData(state); }, 1500);
+    saveTimerRef.current = setTimeout(() => {
+      // Safety check: never overwrite more data than we loaded
+      const backup = (() => { try { return JSON.parse(localStorage.getItem(BACKUP_KEY) ?? "null"); } catch { return null; } })();
+      const backupCount = backup ? countSongs(backup) : 0;
+      const currentCount = countSongs(state);
+      if (backupCount > 0 && currentCount === 0) return; // refuse to wipe data
+      apiSaveData(state);
+    }, 1500);
     return () => clearTimeout(saveTimerRef.current);
   }, [state, session, loading]);
 
@@ -647,8 +687,9 @@ export default function SongVault() {
 
   async function handleLogout() {
     clearTimeout(saveTimerRef.current);
-    await apiSaveData(state);
+    if (!session?.user?.isGuest && hasLoadedData.current) await apiSaveData(state);
     apiLogout();
+    hasLoadedData.current = false;
     setSession(null);
     setStateRaw({ folders: [], unassigned: [], archived: [], soundcloudProfile: null });
   }
