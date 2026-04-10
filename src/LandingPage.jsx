@@ -228,12 +228,13 @@ export default function LandingPage({ onGetStarted, onSignIn }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {[
             { icon: "📝", color: T.accent,  label: "Lyrics + notes editor", desc: "Full-screen lyric editor with a separate notes field for mood, themes, and references." },
-            { icon: "✨", color: T.purple,  label: "AI Song Starter",       desc: "Generate rhyming ending words or a lyric draft from a genre and theme — get unstuck in 10 seconds." },
-            { icon: "📁", color: T.orange,  label: "Projects",              desc: "Group songs into colour-coded projects. Drag unassigned ideas into a project when they're ready." },
+            { icon: "✨", color: T.purple,  label: "AI Song Starter",       desc: "Generate rhyming ending words or a lyric draft from a genre and theme. Create brand-new songs or insert into existing ones — unlock ideas in 10 seconds." },
+            { icon: "⚡", color: T.orange,  label: "Writers Block Breaker", desc: "Stuck on a verse? Feed the AI your current lyrics and get contextual continuations that match your style, mood, and genre." },
+            { icon: "📁", color: T.accent,  label: "Projects",              desc: "Group songs into colour-coded projects. Drag unassigned ideas into a project when they're ready." },
             { icon: "🎵", color: T.green,   label: "Audio player",          desc: "Attach audio files or link YouTube references. Hear your beat while you write the words." },
-            { icon: "🔗", color: T.accent,  label: "Reference links",       desc: "Pin inspiration — a Spotify song, YouTube video, SoundCloud track — directly to the song it belongs to." },
-            { icon: "🤝", color: T.purple,  label: "Credits",               desc: "Every song tracks who wrote, produced, and mixed it. The record is clear before there's anything to dispute." },
-            { icon: "📊", color: T.orange,  label: "Status tracking",       desc: "Idea → In Progress → Done. A simple signal for where each song actually is." },
+            { icon: "🔗", color: T.purple,  label: "Reference links",       desc: "Pin inspiration — a Spotify song, YouTube video, SoundCloud track — directly to the song it belongs to." },
+            { icon: "🤝", color: T.orange,  label: "Credits",               desc: "Every song tracks who wrote, produced, and mixed it. The record is clear before there's anything to dispute." },
+            { icon: "📊", color: T.accent,  label: "Status tracking",       desc: "Idea → In Progress → Done. A simple signal for where each song actually is." },
             { icon: "☁️", color: T.green,   label: "Cloud sync",            desc: "Your vault saves automatically. Open on your phone in the studio, pick up on your laptop at home." },
           ].map(({ icon, color, label, desc }) => (
             <div key={label} style={{
