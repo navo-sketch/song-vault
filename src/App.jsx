@@ -48,6 +48,13 @@ const STORAGE_KEY = "lyriclab-v1";
 
 function genId() { return Math.random().toString(36).slice(2, 9); }
 
+// Returns "Song N" where N = total songs + 1 across unassigned + all folders
+function nextSongName(state) {
+  const total = (state.unassigned?.length ?? 0) +
+    (state.folders?.reduce((n, f) => n + (f.songs?.length ?? 0), 0) ?? 0);
+  return `Song ${total + 1}`;
+}
+
 // ---------- persistence via Cloudflare Worker API ----------
 
 // ---------- dark theme palette ----------
@@ -827,16 +834,16 @@ export default function LyricLab() {
     if (activeFolderId === id) { setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); }
   }
 
-  // Create untitled song directly in a project folder, open it immediately
+  // Create auto-named song directly in a project folder, open it immediately
   function quickCreateSongInFolder(folderId) {
-    const s = { id: genId(), title: "Untitled", status: "idea", lyrics: "", notes: "", links: [], files: [], credits: [] };
+    const s = { id: genId(), title: nextSongName(state), status: "idea", lyrics: "", notes: "", links: [], files: [], credits: [] };
     setState(prev => ({ folders: prev.folders.map(f => f.id !== folderId ? f : { ...f, songs: [...f.songs, s] }) }));
     setActiveSongContext(folderId);
     setActiveSongId(s.id);
   }
 
   function quickCreateSong() {
-    const s = { id: genId(), title: "Untitled", status: "idea", lyrics: "", notes: "", links: [], files: [], credits: [] };
+    const s = { id: genId(), title: nextSongName(state), status: "idea", lyrics: "", notes: "", links: [], files: [], credits: [] };
     setState(prev => ({ unassigned: [...prev.unassigned, s] }));
     setTab("songs");
     setActiveFolderId(null);
@@ -1268,7 +1275,7 @@ export default function LyricLab() {
             onCreateNewSongFromAI={lyrics => {
               const newSong = {
                 id: genId(),
-                title: "Untitled",
+                title: nextSongName(state),
                 status: "idea",
                 lyrics,
                 notes: "",
