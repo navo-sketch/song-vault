@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiLogin, apiSignup } from "./api";
+import MusicNoteKeyhole from "./Logo";
 
 const T = {
   bg: "#0F0F11", card: "#1C1C1E", input: "#2C2C2E",
@@ -58,10 +59,10 @@ export default function AuthScreen({ onAuth }) {
 
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 40, marginBottom: 10 }}>🎵</div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: T.text, letterSpacing: -0.5 }}>Song Vault</div>
+          <MusicNoteKeyhole size={56} color={T.accent} />
+          <div style={{ fontSize: 26, fontWeight: 700, color: T.text, letterSpacing: -0.5, marginTop: 10 }}>LyricLab</div>
           <div style={{ fontSize: 14, color: T.textMuted, marginTop: 6 }}>
-            {mode === "login" ? "Enter vault keys" : "Create your vault"}
+            {mode === "login" ? "Sign in to your lab" : "Create your lab"}
           </div>
         </div>
 

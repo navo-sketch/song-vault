@@ -1,3 +1,5 @@
+import MusicNoteKeyhole from "./Logo";
+
 const T = {
   bg: "#0F0F11", card: "#1C1C1E", cardAlt: "#2C2C2E",
   border: "#3A3A3C", text: "#F2F2F7", textSub: "#EBEBF5CC",
@@ -8,35 +10,40 @@ const T = {
 
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
-function FeatureCard({ icon, color, title, points }) {
+function StepCard({ number, color, icon, title, desc }) {
   return (
     <div style={{
-      background: T.card, borderRadius: 18, padding: "24px 22px",
-      boxShadow: T.shadowLg, border: `1px solid ${T.border}`, flex: "1 1 260px",
+      flex: "1 1 200px", background: T.card, borderRadius: 18,
+      padding: "24px 20px", border: `1px solid ${T.border}`,
+      boxShadow: T.shadowLg, position: "relative", overflow: "hidden",
     }}>
       <div style={{
-        width: 48, height: 48, borderRadius: 14, background: color + "22",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 22, marginBottom: 16,
+        position: "absolute", top: 16, right: 18,
+        fontSize: 42, fontWeight: 800, color: color + "18", lineHeight: 1,
+        letterSpacing: -2, userSelect: "none",
+      }}>{number}</div>
+      <div style={{
+        width: 44, height: 44, borderRadius: 12,
+        background: color + "22", display: "flex", alignItems: "center",
+        justifyContent: "center", fontSize: 20, marginBottom: 14,
       }}>{icon}</div>
-      <div style={{ fontSize: 17, fontWeight: 700, color: T.text, marginBottom: 10 }}>{title}</div>
-      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-        {points.map((p, i) => (
-          <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-            <span style={{ color: color, fontSize: 13, marginTop: 2, flexShrink: 0 }}>✦</span>
-            <span style={{ fontSize: 14, color: T.textMuted, lineHeight: 1.55 }}>{p}</span>
-          </li>
-        ))}
-      </ul>
+      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>{title}</div>
+      <div style={{ fontSize: 14, color: T.textMuted, lineHeight: 1.65 }}>{desc}</div>
     </div>
   );
 }
 
-function StatPill({ value, label }) {
+function QuoteCard({ quote, name, role, color }) {
   return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 28, fontWeight: 800, color: T.text, letterSpacing: -1 }}>{value}</div>
-      <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+    <div style={{
+      flex: "1 1 260px", background: T.card, borderRadius: 18,
+      padding: "24px 22px", border: `1px solid ${T.border}`,
+      borderLeft: `3px solid ${color}`, boxShadow: T.shadowLg,
+    }}>
+      <div style={{ fontSize: 28, color: color, lineHeight: 1, marginBottom: 12, fontFamily: "Georgia, serif" }}>"</div>
+      <p style={{ fontSize: 15, color: T.textSub, lineHeight: 1.75, marginBottom: 18, fontStyle: "italic" }}>{quote}</p>
+      <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{name}</div>
+      <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>{role}</div>
     </div>
   );
 }
@@ -78,221 +85,207 @@ export default function LandingPage({ onGetStarted, onSignIn }) {
         backdropFilter: "blur(12px)", zIndex: 100,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 22 }}>🎵</span>
-          <span style={{ fontSize: 17, fontWeight: 700, color: T.text, letterSpacing: -0.3 }}>Song Vault</span>
+          <MusicNoteKeyhole size={28} color={T.accent} />
+          <span style={{ fontSize: 17, fontWeight: 700, color: T.text, letterSpacing: -0.3 }}>LyricLab</span>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button className="lp-btn-ghost" onClick={onSignIn}
             style={{ padding: "9px 20px", fontSize: 14 }}>Sign In</button>
           <button className="lp-btn-primary" onClick={onGetStarted}
-            style={{ padding: "9px 20px", fontSize: 14 }}>Get Started</button>
+            style={{ padding: "9px 20px", fontSize: 14 }}>Start Writing</button>
         </div>
       </nav>
 
       {/* ── Hero ── */}
-      <section style={{ textAlign: "center", padding: "72px 24px 64px", maxWidth: 680, margin: "0 auto" }}>
-        <div className="lp-tag" style={{ marginBottom: 24 }}>
-          <span>🔐</span> Secure · Private · Built for musicians
+      <section style={{ textAlign: "center", padding: "80px 24px 72px", maxWidth: 700, margin: "0 auto" }}>
+        <div className="lp-tag" style={{ marginBottom: 28 }}>
+          ✍️ Made for songwriters
         </div>
         <h1 style={{
-          fontSize: "clamp(36px, 8vw, 62px)", fontWeight: 800, letterSpacing: -2,
-          color: T.text, lineHeight: 1.08, marginBottom: 20,
+          fontSize: "clamp(38px, 8vw, 66px)", fontWeight: 800, letterSpacing: -2.5,
+          color: T.text, lineHeight: 1.05, marginBottom: 24,
         }}>
-          Your songs,{" "}
+          Write more.{" "}
           <span style={{
-            background: "linear-gradient(135deg, #0A84FF, #BF5AF2)",
+            background: "linear-gradient(135deg, #0A84FF 20%, #BF5AF2 80%)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>
-            secured.
+            Lose nothing.
           </span>
         </h1>
-        <p style={{ fontSize: 18, color: T.textMuted, lineHeight: 1.7, marginBottom: 36, maxWidth: 520, margin: "0 auto 36px" }}>
-          Every riff, lyric, and beat — stored safely in your personal vault.
-          Collaborate with confidence. Never lose a song idea again.
+        <p style={{
+          fontSize: 18, color: T.textMuted, lineHeight: 1.75, marginBottom: 40,
+          maxWidth: 500, margin: "0 auto 40px",
+        }}>
+          The place where song ideas live, grow, and get finished.
+          Lyrics, notes, references, AI starters — everything in one place,
+          synced to the cloud so you never lose a spark.
         </p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
           <button className="lp-btn-primary" onClick={onGetStarted}
             style={{ fontSize: 16, padding: "15px 36px" }}>
-            Create Free Vault
+            Open Your Vault Free
           </button>
           <button className="lp-btn-ghost" onClick={onSignIn}
             style={{ fontSize: 16, padding: "15px 36px" }}>
-            Enter Vault Keys
+            Sign In
           </button>
         </div>
+        <div style={{ marginTop: 18, fontSize: 13, color: T.textFaint }}>
+          No credit card · No installs · Works on every device
+        </div>
       </section>
 
-      {/* ── Stats strip ── */}
-      <div style={{
-        maxWidth: 560, margin: "0 auto 72px",
-        display: "flex", justifyContent: "space-around", alignItems: "center",
-        background: T.card, borderRadius: 18, padding: "28px 32px",
-        boxShadow: T.shadowLg, border: `1px solid ${T.border}`,
-      }}>
-        <StatPill value="100%" label="Private" />
-        <div style={{ width: 1, height: 36, background: T.border }} />
-        <StatPill value="0" label="Data sold" />
-        <div style={{ width: 1, height: 36, background: T.border }} />
-        <StatPill value="∞" label="Song ideas" />
-        <div style={{ width: 1, height: 36, background: T.border }} />
-        <StatPill value="24/7" label="Access" />
-      </div>
-
-      {/* ── Why Song Vault ── */}
-      <section style={{ maxWidth: 960, margin: "0 auto", padding: "0 24px 80px" }}>
+      {/* ── From spark to release ── */}
+      <section style={{ maxWidth: 980, margin: "0 auto", padding: "0 24px 88px" }}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <div className="lp-tag" style={{ marginBottom: 16 }}>Why Song Vault?</div>
-          <h2 style={{ fontSize: "clamp(26px, 5vw, 38px)", fontWeight: 800, letterSpacing: -1, color: T.text }}>
-            Everything a songwriter needs
+          <div className="lp-tag" style={{ marginBottom: 16 }}>The flow</div>
+          <h2 style={{
+            fontSize: "clamp(26px, 5vw, 40px)", fontWeight: 800,
+            letterSpacing: -1.2, color: T.text,
+          }}>
+            From spark to release
           </h2>
           <p style={{ fontSize: 16, color: T.textMuted, marginTop: 12 }}>
-            Without the bloat, the price tag, or the privacy compromises.
+            Every hit started as a random idea. Here&apos;s how LyricLab fits your process.
           </p>
         </div>
-
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-          <FeatureCard
-            icon="🔐"
-            color={T.accent}
-            title="Security you can trust"
-            points={[
-              "JWT-authenticated sessions — only you can open your vault",
-              "All data travels over HTTPS, encrypted in transit",
-              "Tokens expire automatically; no stale access",
-              "Your vault stays private by default — nothing is public unless you share it",
-            ]}
+          <StepCard
+            number="01" color={T.accent} icon="⚡"
+            title="Capture the spark"
+            desc="3am melody. Shower hook. Overheard phrase. Get it down in seconds — title, a line, a voice note link. Don't let it disappear."
           />
-          <FeatureCard
-            icon="🤝"
-            color={T.green}
-            title="Collaboration made easy"
-            points={[
-              "Search other artists by username and connect directly",
-              "Add credits to every song — Producer, Co-writer, Mixer, you name it",
-              "Organize joint work into shared projects with colour-coded folders",
-              "Full edit history synced to the cloud so nothing gets lost",
-            ]}
+          <StepCard
+            number="02" color={T.purple} icon="✍️"
+            title="Build it out"
+            desc="Open the song anytime and keep writing. Lyrics editor, notes, status tracking — move it from Idea to In Progress as the song grows."
           />
-          <FeatureCard
-            icon="🎵"
-            color={T.purple}
-            title="Built around the music"
-            points={[
-              "Lyrics editor, notes, status tracking (Idea → In Progress → Done)",
-              "Attach audio files with a built-in player — hear it while you write",
-              "Link references, inspirations, and stems directly to a song",
-              "Works on every device — phone in the studio, laptop at home",
-            ]}
+          <StepCard
+            number="03" color={T.orange} icon="✨"
+            title="Get unstuck with AI"
+            desc="Stuck on a verse? Use the AI Song Starter to generate rhyming ending words or a full lyric draft. Use it as a jumping-off point, not a crutch."
+          />
+          <StepCard
+            number="04" color={T.green} icon="🎧"
+            title="Ship it"
+            desc="Mark it Done, connect your SoundCloud, and push the release — all from the same app where you wrote the song."
           />
         </div>
       </section>
 
-      {/* ── Security deep-dive ── */}
+      {/* ── Quote cards ── */}
       <section style={{
         background: T.card, borderTop: `1px solid ${T.border}`,
-        borderBottom: `1px solid ${T.border}`, padding: "64px 24px",
+        borderBottom: `1px solid ${T.border}`, padding: "72px 24px",
       }}>
-        <div style={{ maxWidth: 800, margin: "0 auto" }}>
-          <div style={{ display: "flex", gap: 48, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ flex: "1 1 300px" }}>
-              <div className="lp-tag" style={{ marginBottom: 16 }}>Security</div>
-              <h2 style={{ fontSize: "clamp(22px, 4vw, 32px)", fontWeight: 800, letterSpacing: -0.8, color: T.text, marginBottom: 16 }}>
-                Your vault is yours alone
-              </h2>
-              <p style={{ fontSize: 15, color: T.textMuted, lineHeight: 1.75, marginBottom: 20 }}>
-                Song Vault uses industry-standard JWT authentication. When you log in,
-                you receive a signed token that proves your identity without ever exposing
-                your password. Tokens are short-lived and checked on every request —
-                so even if one somehow leaked, it would expire quickly.
-              </p>
-              <p style={{ fontSize: 15, color: T.textMuted, lineHeight: 1.75 }}>
-                Your vault data is stored on your account only. No other user can read,
-                write, or list your songs — the API enforces ownership at the server level,
-                not just in the UI.
-              </p>
-            </div>
-            <div style={{ flex: "1 1 240px", display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                { icon: "🛡", label: "JWT Auth", desc: "Signed, expiring tokens on every request" },
-                { icon: "🔒", label: "HTTPS only", desc: "All traffic encrypted in transit" },
-                { icon: "👤", label: "Ownership enforced", desc: "Server-level access control, not just UI" },
-                { icon: "⏱", label: "Auto-expiry", desc: "Sessions expire — stale tokens are rejected" },
-              ].map(({ icon, label, desc }) => (
-                <div key={label} style={{
-                  display: "flex", alignItems: "center", gap: 14,
-                  background: T.cardAlt, borderRadius: 12, padding: "12px 16px",
-                  border: `1px solid ${T.border}`,
-                }}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>{icon}</span>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{label}</div>
-                    <div style={{ fontSize: 12, color: T.textMuted, marginTop: 1 }}>{desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+        <div style={{ maxWidth: 980, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 48 }}>
+            <h2 style={{
+              fontSize: "clamp(22px, 4vw, 34px)", fontWeight: 800,
+              letterSpacing: -1, color: T.text,
+            }}>
+              Built by a writer, for writers
+            </h2>
+            <p style={{ fontSize: 16, color: T.textMuted, marginTop: 12 }}>
+              These are the frustrations that built this app.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <QuoteCard
+              color={T.accent}
+              quote="I had a great hook in my Notes app but by the time I found it the feeling was gone. Now everything starts and lives in one place."
+              name="Late-night writer"
+              role="Hip-hop, R&B"
+            />
+            <QuoteCard
+              color={T.purple}
+              quote="The AI ending words tool is the first AI feature that actually fits how I write. I use it to unlock a verse when I'm circling the same rhyme."
+              name="Solo artist"
+              role="Pop, indie"
+            />
+            <QuoteCard
+              color={T.green}
+              quote="Collaborating used to mean texting voice memos back and forth. Now we both work in the same project, with credits attached to everything."
+              name="Producer / co-writer"
+              role="Trap, afrobeats"
+            />
           </div>
         </div>
       </section>
 
-      {/* ── Collaboration deep-dive ── */}
-      <section style={{ maxWidth: 800, margin: "0 auto", padding: "64px 24px" }}>
-        <div className="lp-tag" style={{ marginBottom: 16 }}>Collaboration</div>
-        <h2 style={{ fontSize: "clamp(22px, 4vw, 32px)", fontWeight: 800, letterSpacing: -0.8, color: T.text, marginBottom: 16 }}>
-          Write together, stay organised
-        </h2>
-        <p style={{ fontSize: 15, color: T.textMuted, lineHeight: 1.75, marginBottom: 40 }}>
-          Music is rarely made alone. Song Vault is built with that in mind —
-          from crediting every contributor to finding the right collaborator by username.
-        </p>
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+      {/* ── Features ── */}
+      <section style={{ maxWidth: 800, margin: "0 auto", padding: "72px 24px 80px" }}>
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <div className="lp-tag" style={{ marginBottom: 16 }}>What&apos;s inside</div>
+          <h2 style={{
+            fontSize: "clamp(24px, 5vw, 36px)", fontWeight: 800,
+            letterSpacing: -1, color: T.text,
+          }}>
+            Everything you need. Nothing you don&apos;t.
+          </h2>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {[
-            {
-              step: "01", color: T.accent,
-              title: "Find artists",
-              desc: "Search any username directly from the More tab. No social graph required — just a name and a connection.",
-            },
-            {
-              step: "02", color: T.green,
-              title: "Credit everyone",
-              desc: "Every song has a Credits section. Add names and roles — producer, co-writer, mixer, featured artist — so the record is always clear.",
-            },
-            {
-              step: "03", color: T.purple,
-              title: "Organise by project",
-              desc: "Group songs into colour-coded projects. Assign any song to a project in one tap, even if it started as a solo idea.",
-            },
-          ].map(({ step, color, title, desc }) => (
-            <div key={step} style={{
-              flex: "1 1 200px", background: T.card, borderRadius: 16,
-              padding: "22px 20px", border: `1px solid ${T.border}`, boxShadow: T.shadow,
+            { icon: "📝", color: T.accent,  label: "Lyrics + notes editor", desc: "Full-screen lyric editor with a separate notes field for mood, themes, and references." },
+            { icon: "✨", color: T.purple,  label: "AI Song Starter",       desc: "Generate rhyming ending words or a lyric draft from a genre and theme — get unstuck in 10 seconds." },
+            { icon: "📁", color: T.orange,  label: "Projects",              desc: "Group songs into colour-coded projects. Drag unassigned ideas into a project when they're ready." },
+            { icon: "🎵", color: T.green,   label: "Audio player",          desc: "Attach audio files or link YouTube references. Hear your beat while you write the words." },
+            { icon: "🔗", color: T.accent,  label: "Reference links",       desc: "Pin inspiration — a Spotify song, YouTube video, SoundCloud track — directly to the song it belongs to." },
+            { icon: "🤝", color: T.purple,  label: "Credits",               desc: "Every song tracks who wrote, produced, and mixed it. The record is clear before there's anything to dispute." },
+            { icon: "📊", color: T.orange,  label: "Status tracking",       desc: "Idea → In Progress → Done. A simple signal for where each song actually is." },
+            { icon: "☁️", color: T.green,   label: "Cloud sync",            desc: "Your vault saves automatically. Open on your phone in the studio, pick up on your laptop at home." },
+          ].map(({ icon, color, label, desc }) => (
+            <div key={label} style={{
+              display: "flex", alignItems: "flex-start", gap: 16,
+              padding: "18px 20px", borderRadius: 14,
+              border: `1px solid ${T.border}`, marginBottom: 8,
+              background: T.card,
             }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color, letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 }}>
-                Step {step}
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: color + "20", display: "flex", alignItems: "center",
+                justifyContent: "center", fontSize: 18,
+              }}>{icon}</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 14, color: T.textMuted, lineHeight: 1.6 }}>{desc}</div>
               </div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 14, color: T.textMuted, lineHeight: 1.6 }}>{desc}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── CTA footer ── */}
+      {/* ── Final CTA ── */}
       <section style={{
-        textAlign: "center", padding: "64px 24px 72px",
+        textAlign: "center", padding: "72px 24px 88px",
         background: T.card, borderTop: `1px solid ${T.border}`,
       }}>
-        <div style={{ fontSize: 40, marginBottom: 16 }}>🎵</div>
-        <h2 style={{ fontSize: "clamp(24px, 5vw, 36px)", fontWeight: 800, letterSpacing: -0.8, color: T.text, marginBottom: 14 }}>
-          Ready to open your vault?
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+          <MusicNoteKeyhole size={52} color={T.accent} />
+        </div>
+        <h2 style={{
+          fontSize: "clamp(26px, 5vw, 42px)", fontWeight: 800,
+          letterSpacing: -1.2, color: T.text, marginBottom: 16, lineHeight: 1.15,
+        }}>
+          The song you&apos;re sitting on?<br />
+          <span style={{
+            background: "linear-gradient(135deg, #0A84FF 20%, #BF5AF2 80%)",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          }}>
+            Write it tonight.
+          </span>
         </h2>
-        <p style={{ fontSize: 16, color: T.textMuted, marginBottom: 32, maxWidth: 400, margin: "0 auto 32px" }}>
+        <p style={{
+          fontSize: 16, color: T.textMuted, marginBottom: 36,
+          maxWidth: 400, margin: "0 auto 36px",
+        }}>
           Free to use. No credit card. Your songs stay yours.
         </p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
           <button className="lp-btn-primary" onClick={onGetStarted}
             style={{ fontSize: 16, padding: "15px 36px" }}>
-            Create Free Vault
+            Open Your Vault Free
           </button>
           <button className="lp-btn-ghost" onClick={onSignIn}
             style={{ fontSize: 16, padding: "15px 36px" }}>
@@ -300,6 +293,16 @@ export default function LandingPage({ onGetStarted, onSignIn }) {
           </button>
         </div>
       </section>
+
+      {/* ── Footer ── */}
+      <footer style={{
+        padding: "24px", borderTop: `1px solid ${T.border}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        gap: 10,
+      }}>
+        <MusicNoteKeyhole size={18} color={T.textFaint} />
+        <span style={{ fontSize: 13, color: T.textFaint }}>LyricLab — write more, finish more</span>
+      </footer>
     </div>
   );
 }

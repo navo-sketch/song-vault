@@ -1,5 +1,5 @@
 // ============================================================
-// Song Vault — full rewrite
+// LyricLab — full rewrite
 // CHANGES vs previous version:
 //   FIX 1: delete buttons use e.stopPropagation() to prevent row clicks
 //   FIX 2: activeSongId / activeFolderId cleared immediately on delete
@@ -14,16 +14,38 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from "react";
-import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers } from "./api";
+import { getStoredSession, apiLogout, apiGetData, apiSaveData, apiSearchUsers, apiSoundCloudSendCode, apiSoundCloudVerifyCode } from "./api";
 import AuthScreen from "./AuthScreen";
 import LandingPage from "./LandingPage";
+import MusicNoteKeyhole from "./Logo";
+
+// ---------- global audio player (lock screen) ----------
+const globalAudioElement = new Audio();
+globalAudioElement.crossOrigin = "anonymous";
+
+async function getYouTubeAudioUrl(videoId) {
+  try {
+    const res = await fetch(`https://api.cobalt.tools/api/json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        audioFormat: "best"
+      })
+    });
+    const data = await res.json();
+    return data.url || null;
+  } catch {
+    return null;
+  }
+}
 
 const COLORS = ["#0A84FF", "#30D158", "#FF9F0A", "#FF375F", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A"];
-const STORAGE_KEY = "song-vault-v1";
+const STORAGE_KEY = "lyriclab-v1";
 
 function genId() { return Math.random().toString(36).slice(2, 9); }
 
-// ---------- persistence handled via Supabase (see SongVault component) ----------
+// ---------- persistence via Cloudflare Worker API ----------
 
 // ---------- dark theme palette ----------
 const T = {
@@ -94,8 +116,40 @@ function AudioPlayer({ file }) {
   );
 }
 
+// ---------- link embed helpers ----------
+function getYouTubeId(url) {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+function getLinkEmbed(url) {
+  const ytId = getYouTubeId(url);
+  if (ytId) return `https://www.youtube.com/embed/${ytId}?autoplay=1`;
+  return null;
+}
+
+function LinkPlayer({ url }) {
+  const ytId = getYouTubeId(url);
+  if (!ytId) return null;
+  const youtubeUrl = `https://www.youtube.com/watch?v=${ytId}`;
+  return (
+    <div style={{ borderRadius: 10, overflow: "hidden", marginTop: 8, background: T.cardAlt, padding: "14px", border: `1px solid ${T.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          onClick={() => window.open(youtubeUrl, '_blank')}
+          style={{ width: 48, height: 48, borderRadius: 8, background: T.accent, border: "none", color: "#fff", fontSize: 20, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          ▶
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>YouTube Audio</div>
+          <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>Click to play (opens YouTube)</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- song detail view ----------
-function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign }) {
+function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign, soundcloudProfile, onPlayAudio }) {
   const [showNewLink, setShowNewLink] = useState(false);
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl]     = useState("");
@@ -110,6 +164,37 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
   const [editingCreditId, setEditingCreditId] = useState(null);
   const [editCreditName,  setEditCreditName]  = useState("");
   const [editCreditRole,  setEditCreditRole]  = useState("");
+
+  const [expandedLinkId,  setExpandedLinkId]  = useState(null);
+
+  const [aiOpen,       setAiOpen]       = useState(false);
+  const [aiType,       setAiType]       = useState("lyrics");
+  const [aiGenre,      setAiGenre]      = useState("");
+  const [aiTheme,      setAiTheme]      = useState("");
+  const [aiCount,      setAiCount]      = useState("8");
+  const [aiResult,     setAiResult]     = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError,      setAiError]      = useState(null);
+
+  async function generateStarter() {
+    setAiGenerating(true); setAiError(null); setAiResult("");
+    const genre = aiGenre.trim() || "general";
+    const theme = aiTheme.trim() || "personal experience";
+    let prompt;
+    if (aiType === "endwords") {
+      prompt = `Generate ${aiCount} sets of rhyming ending words for rap bars. Genre: ${genre}. Theme: ${theme}. Format: each line should be a single rhyming word only — no full sentences, no explanations. Group into rhyme pairs or sets of 4. Output only the words, one per line.`;
+    } else {
+      prompt = `Write ${aiCount} lines of song lyrics for a ${genre} song. Theme: ${theme}. Output only the lyrics, no intro or explanation. Each line on its own line.`;
+    }
+    try {
+      const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`, { method: "GET" });
+      const text = await res.text();
+      setAiResult(text.trim());
+    } catch {
+      setAiError("Generation failed. Check your connection and try again.");
+    }
+    setAiGenerating(false);
+  }
 
   if (!song) return null;
 
@@ -209,6 +294,30 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
         ))}
       </div>
 
+      {/* Release ready */}
+      {song.status === "done" && (
+        <div style={{ ...cardStyle, borderLeft: `3px solid ${STATUS.done.color}` }}>
+          <div style={sectionLabel}>Release Ready</div>
+          {soundcloudProfile?.verified ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 22 }}>🎧</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{soundcloudProfile.username || soundcloudProfile.url}</div>
+                <div style={{ fontSize: 13, color: T.textMuted }}>SoundCloud connected</div>
+              </div>
+              <a href={`https://${soundcloudProfile.url}`} target="_blank" rel="noopener noreferrer"
+                style={{ padding: "8px 14px", borderRadius: 9, border: "none", background: T.accent, color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                Open SoundCloud
+              </a>
+            </div>
+          ) : (
+            <div style={{ fontSize: 14, color: T.textMuted }}>
+              Connect your SoundCloud account in <strong style={{ color: T.text }}>More → SoundCloud</strong> to manage your release.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Assign to project */}
       {folderId === "unassigned" && folders.folders.length > 0 && (
         <div style={cardStyle}>
@@ -226,53 +335,135 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
         </div>
       )}
 
-      {/* Notes */}
-      <div style={cardStyle}>
-        <div style={sectionLabel}>Notes</div>
-        <textarea value={song.notes} onChange={e => updateSong({ notes: e.target.value })}
-          placeholder="Mood, themes, references, ideas..." rows={3}
-          style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 1.7, padding: 0 }} />
-      </div>
-
       {/* Lyrics */}
       <div style={cardStyle}>
         <div style={sectionLabel}>Lyrics</div>
-        <textarea value={song.lyrics} onChange={e => updateSong({ lyrics: e.target.value })}
+        <textarea value={song.lyrics ?? ""} onChange={e => updateSong({ lyrics: e.target.value })}
           placeholder="Start writing..." rows={10}
           style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 2, padding: 0 }} />
+      </div>
+
+      {/* AI Song Starter */}
+      <div style={cardStyle}>
+        <button onClick={() => setAiOpen(o => !o)}
+          style={{ width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 16 }}>✨</span>
+            <span style={{ ...sectionLabel, marginBottom: 0 }}>AI Song Starter</span>
+          </div>
+          <span style={{ fontSize: 13, color: T.textMuted }}>{aiOpen ? "▲" : "▼"}</span>
+        </button>
+        {aiOpen && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              {["lyrics", "endwords"].map(t => (
+                <button key={t} onClick={() => setAiType(t)}
+                  style={{ flex: 1, padding: "8px", borderRadius: 9, border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer",
+                    background: aiType === t ? T.accent : T.cardAlt,
+                    color: aiType === t ? "#fff" : T.textMuted }}>
+                  {t === "endwords" ? "🎤 Ending Words" : "🎵 Lyrics"}
+                </button>
+              ))}
+            </div>
+            <input placeholder="Genre (e.g. hip-hop, pop, R&B)" value={aiGenre} onChange={e => setAiGenre(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 14, background: T.input, color: T.text, marginBottom: 8 }} />
+            <input placeholder="Theme / topic (e.g. late nights, heartbreak)" value={aiTheme} onChange={e => setAiTheme(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 14, background: T.input, color: T.text, marginBottom: 8 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: T.textMuted, flexShrink: 0 }}>Lines:</span>
+              {["4", "8", "16"].map(n => (
+                <button key={n} onClick={() => setAiCount(n)}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", fontSize: 13, cursor: "pointer",
+                    background: aiCount === n ? T.accent : T.cardAlt,
+                    color: aiCount === n ? "#fff" : T.textMuted }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button onClick={generateStarter} disabled={aiGenerating}
+              style={{ width: "100%", padding: "10px", borderRadius: 9, border: "none", background: T.accent, color: "#fff", fontSize: 15, fontWeight: 600, opacity: aiGenerating ? 0.6 : 1, cursor: aiGenerating ? "not-allowed" : "pointer" }}>
+              {aiGenerating ? "Generating…" : "✨ Generate"}
+            </button>
+            {aiError && <div style={{ fontSize: 13, color: T.danger, marginTop: 8 }}>{aiError}</div>}
+            {aiResult && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ background: T.cardAlt, borderRadius: 9, padding: "12px 14px", border: `1px solid ${T.border}` }}>
+                  <pre style={{ fontSize: 14, color: T.text, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>{aiResult}</pre>
+                </div>
+                <button onClick={() => updateSong({ lyrics: (song.lyrics ? song.lyrics + "\n\n" : "") + aiResult })}
+                  style={{ marginTop: 10, width: "100%", padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, color: T.accent, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                  Insert into Lyrics
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Notes */}
+      <div style={cardStyle}>
+        <div style={sectionLabel}>Notes</div>
+        <textarea value={song.notes ?? ""} onChange={e => updateSong({ notes: e.target.value })}
+          placeholder="Mood, themes, references, ideas..." rows={3}
+          style={{ width: "100%", border: "none", background: "none", fontSize: 15, color: T.text, resize: "none", lineHeight: 1.7, padding: 0 }} />
       </div>
 
       {/* Links */}
       <div style={cardStyle}>
         <div style={sectionLabel}>Links</div>
-        {song.links?.map((link, i) => (
-          <div key={link.id}>
-            {i > 0 && <Divider />}
-            {editingLinkId === link.id ? (
-              <div>
-                <input autoFocus value={editLinkLabel} onChange={e => setEditLinkLabel(e.target.value)} placeholder="Label"
-                  style={{ ...inputStyle, border: `1px solid ${T.accent}` }} />
-                <input value={editLinkUrl} onChange={e => setEditLinkUrl(e.target.value)} placeholder="https://..."
-                  onKeyDown={e => { if (e.key === "Enter") saveEditLink(); if (e.key === "Escape") setEditingLinkId(null); }}
-                  style={{ ...inputStyle, marginBottom: 10 }} />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setEditingLinkId(null)} style={{ flex: 1, padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, fontSize: 14, color: T.text }}>Cancel</button>
-                  <button onClick={saveEditLink} style={{ flex: 1, padding: "9px", borderRadius: 9, border: "none", background: T.accent, fontSize: 14, fontWeight: 600, color: "#fff" }}>Save</button>
+        {song.links?.map((link, i) => {
+          const embed = getLinkEmbed(link.url);
+          const isExpanded = expandedLinkId === link.id;
+          return (
+            <div key={link.id}>
+              {i > 0 && <Divider />}
+              {editingLinkId === link.id ? (
+                <div>
+                  <input autoFocus value={editLinkLabel} onChange={e => setEditLinkLabel(e.target.value)} placeholder="Label"
+                    style={{ ...inputStyle, border: `1px solid ${T.accent}` }} />
+                  <input value={editLinkUrl} onChange={e => setEditLinkUrl(e.target.value)} placeholder="https://..."
+                    onKeyDown={e => { if (e.key === "Enter") saveEditLink(); if (e.key === "Escape") setEditingLinkId(null); }}
+                    style={{ ...inputStyle, marginBottom: 10 }} />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setEditingLinkId(null)} style={{ flex: 1, padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, fontSize: 14, color: T.text }}>Cancel</button>
+                    <button onClick={saveEditLink} style={{ flex: 1, padding: "9px", borderRadius: 9, border: "none", background: T.accent, fontSize: 14, fontWeight: 600, color: "#fff" }}>Save</button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 17 }}>🔗</span>
-                <a href={link.url} target="_blank" rel="noopener noreferrer"
-                  style={{ flex: 1, color: T.accent, fontSize: 15, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{link.label}</a>
-                <button onClick={() => { setEditingLinkId(link.id); setEditLinkLabel(link.label); setEditLinkUrl(link.url); }}
-                  style={{ background: "none", border: "none", color: T.accent, fontSize: 13, opacity: 0.8 }}>Edit</button>
-                <button onClick={e => { e.stopPropagation(); removeLink(link.id); }}
-                  style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1 }}>×</button>
-              </div>
-            )}
-          </div>
-        ))}
+              ) : (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {embed ? (
+                      <button onClick={() => setExpandedLinkId(isExpanded ? null : link.id)}
+                        style={{ background: "none", border: "none", fontSize: 17, padding: 0, lineHeight: 1, cursor: "pointer" }}
+                        title={isExpanded ? "Close player" : "Play on YouTube"}>
+                        {isExpanded ? "⏹" : "▶️"}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 17 }}>🔗</span>
+                    )}
+                    <a href={link.url} target="_blank" rel="noopener noreferrer"
+                      style={{ flex: 1, color: T.accent, fontSize: 15, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{link.label}</a>
+                    <button onClick={() => { setEditingLinkId(link.id); setEditLinkLabel(link.label); setEditLinkUrl(link.url); }}
+                      style={{ background: "none", border: "none", color: T.accent, fontSize: 13, opacity: 0.8 }}>Edit</button>
+                    <button onClick={e => { e.stopPropagation(); removeLink(link.id); }}
+                      style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1 }}>×</button>
+                  </div>
+                  {isExpanded && (
+                    <div style={{ marginTop: 12 }}>
+                      <LinkPlayer url={link.url} />
+                      {getYouTubeId(link.url) && (
+                        <button onClick={() => onPlayAudio(song, "youtube")}
+                          style={{ marginTop: 10, padding: "8px 14px", borderRadius: 8, background: T.accent, border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                          ▶ Play audio in background
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
         {song.links?.length > 0 && <Divider />}
         {showNewLink ? (
           <div>
@@ -303,6 +494,12 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
               <EditableText value={file.name} onSave={val => val.trim() && renameFile(file.id, val.trim())}
                 placeholder="filename" style={{ flex: 1, fontSize: 14, color: T.text }} />
               <span style={{ fontSize: 12, color: T.textFaint, flexShrink: 0 }}>{(file.size / 1024).toFixed(0)} KB</span>
+              {file.type?.startsWith("audio/") && (
+                <button onClick={() => onPlayAudio(song, "file")}
+                  style={{ background: "none", border: "none", color: T.accent, fontSize: 16, padding: 0, cursor: "pointer" }}>
+                  ▶
+                </button>
+              )}
               <a href={file.dataUrl} download={file.name} style={{ color: T.accent, fontSize: 13, textDecoration: "none", flexShrink: 0 }}>↓</a>
               <button onClick={e => { e.stopPropagation(); removeFile(file.id); }}
                 style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1 }}>×</button>
@@ -364,10 +561,10 @@ function SongDetail({ song, folderId, folders, setFolders, onDelete, onAssign })
         )}
       </div>
 
-      {/* Delete song */}
+      {/* Archive song */}
       <button onClick={e => { e.stopPropagation(); onDelete(song.id); }}
-        style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: T.card, fontSize: 15, color: T.danger, fontWeight: 500, boxShadow: T.shadow }}>
-        Delete Song
+        style={{ width: "100%", padding: "13px", borderRadius: 12, border: `1px solid ${T.border}`, background: T.card, fontSize: 15, color: T.textMuted, fontWeight: 500, boxShadow: T.shadow }}>
+        Archive Song
       </button>
     </div>
   );
@@ -400,19 +597,55 @@ function SongRow({ song, folderName, folderColor, onClick }) {
 // ============================================================
 // Main app
 // ============================================================
-export default function SongVault() {
+export default function LyricLab() {
   // ── Auth + cloud sync ──
   const initialSession = getStoredSession() ?? null;
   const [session,  setSession]  = useState(initialSession);
   const [loading,  setLoading]  = useState(!!initialSession);
   const [showAuth, setShowAuth] = useState(false);
-  const [state,    setStateRaw] = useState({ folders: [], unassigned: [] });
-  const saveTimerRef            = useRef(null);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [state,    setStateRaw] = useState({ folders: [], unassigned: [], archived: [], soundcloudProfile: null });
+  const saveTimerRef   = useRef(null);
+  const hasLoadedData  = useRef(false);   // never auto-save until at least one real load
+  const BACKUP_KEY     = "sv_local_backup";
+
+  function hydrateState(data) {
+    const safe = {
+      folders:          data.folders          ?? [],
+      unassigned:       data.unassigned       ?? [],
+      archived:         data.archived         ?? [],
+      soundcloudProfile: data.soundcloudProfile ?? null,
+    };
+    setStateRaw(safe);
+    hasLoadedData.current = true;
+    // Mirror every successful load to localStorage as a local backup
+    try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ ...safe, _savedAt: Date.now() })); } catch (e) { void e; }
+  }
+
+  function countSongs(s) {
+    return (s.unassigned?.length ?? 0) +
+           (s.folders?.reduce((n, f) => n + (f.songs?.length ?? 0), 0) ?? 0);
+  }
 
   async function loadData() {
-    const res = await apiGetData();
-    if (res.data) {
-      setStateRaw({ folders: res.data.folders ?? [], unassigned: res.data.unassigned ?? [] });
+    try {
+      const res = await apiGetData();
+      if (res.data) {
+        hydrateState(res.data);
+      } else {
+        // Cloud returned nothing — fall back to local backup silently
+        const raw = localStorage.getItem(BACKUP_KEY);
+        if (raw) {
+          const backup = JSON.parse(raw);
+          hydrateState(backup);
+          // Push backup back up to the server so it's there next time
+          await apiSaveData(backup);
+        }
+      }
+    } catch {
+      // Network error — try local backup
+      const raw = localStorage.getItem(BACKUP_KEY);
+      if (raw) { try { hydrateState(JSON.parse(raw)); } catch (e) { void e; } }
     }
     setLoading(false);
   }
@@ -420,33 +653,45 @@ export default function SongVault() {
   useEffect(() => {
     if (getStoredSession()) {
       apiGetData().then(res => {
-        if (res.data) {
-          setStateRaw({ folders: res.data.folders ?? [], unassigned: res.data.unassigned ?? [] });
-        }
+        if (res.data) hydrateState(res.data);
         setLoading(false);
       });
     }
   }, []);
 
-  // Debounced auto-save — fires 1.5s after last state change
+  // Debounced auto-save — only fires after real data has been loaded at least once
   useEffect(() => {
-    if (!session || loading) return;
+    if (!session || loading || session.user?.isGuest || !hasLoadedData.current) return;
     clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => { apiSaveData(state); }, 1500);
+    saveTimerRef.current = setTimeout(() => {
+      // Safety check: never overwrite more data than we loaded
+      const backup = (() => { try { return JSON.parse(localStorage.getItem(BACKUP_KEY) ?? "null"); } catch { return null; } })();
+      const backupCount = backup ? countSongs(backup) : 0;
+      const currentCount = countSongs(state);
+      if (backupCount > 0 && currentCount === 0) return; // refuse to wipe data
+      apiSaveData(state);
+    }, 1500);
     return () => clearTimeout(saveTimerRef.current);
   }, [state, session, loading]);
 
   function handleAuth(user) {
+    setLoading(true); // block auto-save until real data is loaded
     setSession({ user });
-    loadData();
+    setIsUnlocking(true);
+    setTimeout(() => {
+      setIsUnlocking(false);
+      if (!user.isGuest) loadData();
+      else setLoading(false);
+    }, 1800);
   }
 
   async function handleLogout() {
     clearTimeout(saveTimerRef.current);
-    await apiSaveData(state);
+    if (!session?.user?.isGuest && hasLoadedData.current) await apiSaveData(state);
     apiLogout();
+    hasLoadedData.current = false;
     setSession(null);
-    setStateRaw({ folders: [], unassigned: [] });
+    setStateRaw({ folders: [], unassigned: [], archived: [], soundcloudProfile: null });
   }
 
   function setState(updater) {
@@ -456,7 +701,7 @@ export default function SongVault() {
     });
   }
 
-  const { folders, unassigned } = state;
+  const { folders, unassigned, archived, soundcloudProfile } = state;
 
   const [tab, setTab] = useState("songs");
   const [activeFolderId, setActiveFolderId] = useState(null);
@@ -482,8 +727,46 @@ export default function SongVault() {
   const [newSongTitle, setNewSongTitle] = useState("");
 
   const [userQuery,    setUserQuery]    = useState("");
-  const [userResults,  setUserResults]  = useState(null); // null=not searched, []= no results
+  const [userResults,  setUserResults]  = useState(null);
   const [userSearching, setUserSearching] = useState(false);
+
+  const [scInput,      setScInput]      = useState(soundcloudProfile?.url || "");
+  const [scCodeSent,   setScCodeSent]   = useState(false);
+  const [scCode,       setScCode]       = useState("");
+  const [scVerifying,  setScVerifying]  = useState(false);
+  const [scSending,    setScSending]    = useState(false);
+  const [scError,      setScError]      = useState(null);
+
+  const [nowPlaying,   setNowPlaying]   = useState(null);
+
+  function normalizeScUrl(raw) { return raw.trim().replace(/^https?:\/\//i, "").replace(/\/$/, ""); }
+
+  async function scSendCode() {
+    if (!scInput.trim()) return;
+    setScSending(true); setScError(null);
+    const url = normalizeScUrl(scInput);
+    const res = await apiSoundCloudSendCode(url);
+    setScSending(false);
+    if (res.error) { setScError(res.error); return; }
+    setScInput(url);
+    setScCodeSent(true);
+  }
+
+  async function scVerify() {
+    if (!scCode.trim()) return;
+    setScVerifying(true); setScError(null);
+    const url = normalizeScUrl(scInput);
+    const res = await apiSoundCloudVerifyCode(url, scCode.trim());
+    setScVerifying(false);
+    if (res.error || !res.verified) { setScError(res.error || "Code incorrect or expired."); return; }
+    setState({ soundcloudProfile: { url, username: res.username || url, verified: true } });
+    setScCodeSent(false); setScCode("");
+  }
+
+  function scDisconnect() {
+    setState({ soundcloudProfile: null });
+    setScInput(""); setScCodeSent(false); setScCode(""); setScError(null);
+  }
 
   async function searchUsers() {
     if (!userQuery.trim()) return;
@@ -492,6 +775,51 @@ export default function SongVault() {
     setUserSearching(false);
     setUserResults(res.users ?? []);
   }
+
+  async function playAudio(song, source) {
+    if (!song) return;
+    let audioUrl = null;
+    let title = song.title || "Untitled";
+    let artist = "";
+
+    if (source === "file") {
+      const audioFile = song.files?.find(f => f.type?.startsWith("audio/"));
+      if (audioFile?.dataUrl) {
+        audioUrl = audioFile.dataUrl;
+        artist = "LyricLab";
+      }
+    } else if (source === "youtube") {
+      const link = song.links?.find(l => getYouTubeId(l.url));
+      if (link) {
+        const ytId = getYouTubeId(link.url);
+        artist = `YouTube · ${link.label}`;
+        audioUrl = await getYouTubeAudioUrl(ytId);
+      }
+    }
+
+    if (!audioUrl) return;
+
+    globalAudioElement.src = audioUrl;
+    globalAudioElement.play().catch(() => {});
+    setNowPlaying({ title, artist });
+
+    if (navigator.mediaSession) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title,
+        artist,
+        album: "LyricLab"
+      });
+      navigator.mediaSession.setActionHandler("play", () => globalAudioElement.play());
+      navigator.mediaSession.setActionHandler("pause", () => globalAudioElement.pause());
+    }
+  }
+
+  useEffect(() => {
+    if (!nowPlaying) return;
+    if (navigator.mediaSession) {
+      navigator.mediaSession.playbackState = globalAudioElement.paused ? "paused" : "playing";
+    }
+  }, [nowPlaying]);
 
   function createFolder() {
     if (!newFolderName.trim()) return;
@@ -525,15 +853,52 @@ export default function SongVault() {
     setNewSongTitle(""); setShowNewSong(false);
   }
 
-  function deleteSong(id) {
-    if (!confirm("Delete this song?")) return;
-    if (activeSongContext === "unassigned") {
-      setState(prev => ({ unassigned: prev.unassigned.filter(s => s.id !== id) }));
-    } else {
-      setState(prev => ({ folders: prev.folders.map(f => f.id !== activeSongContext ? f : { ...f, songs: f.songs.filter(s => s.id !== id) }) }));
-    }
+  function quickCreateSong() {
+    const s = { id: genId(), title: "Untitled", status: "idea", lyrics: "", notes: "", links: [], files: [], credits: [] };
+    setState(prev => ({ unassigned: [...prev.unassigned, s] }));
+    setTab("songs");
+    setActiveFolderId(null);
+    setActiveSongContext("unassigned");
+    setActiveSongId(s.id);
+  }
+
+  function archiveSong(id) {
+    setState(prev => {
+      let song = null;
+      let updatedFolders = prev.folders;
+      let updatedUnassigned = prev.unassigned;
+      if (activeSongContext === "unassigned") {
+        song = prev.unassigned.find(s => s.id === id);
+        updatedUnassigned = prev.unassigned.filter(s => s.id !== id);
+      } else {
+        const folder = prev.folders.find(f => f.id === activeSongContext);
+        song = folder?.songs.find(s => s.id === id);
+        updatedFolders = prev.folders.map(f => f.id !== activeSongContext ? f : { ...f, songs: f.songs.filter(s => s.id !== id) });
+      }
+      if (!song) return prev;
+      const archivedEntry = { ...song, _archivedFrom: activeSongContext, _archivedAt: Date.now() };
+      return { folders: updatedFolders, unassigned: updatedUnassigned, archived: [...prev.archived, archivedEntry] };
+    });
     setActiveSongId(null);
     setActiveSongContext(null);
+  }
+
+  function restoreSong(id) {
+    setState(prev => {
+      const song = prev.archived.find(s => s.id === id);
+      if (!song) return prev;
+      const { _archivedFrom, _archivedAt, ...cleanSong } = song;
+      const newArchived = prev.archived.filter(s => s.id !== id);
+      if (_archivedFrom === "unassigned" || !prev.folders.find(f => f.id === _archivedFrom)) {
+        return { archived: newArchived, unassigned: [...prev.unassigned, cleanSong] };
+      }
+      return { archived: newArchived, folders: prev.folders.map(f => f.id !== _archivedFrom ? f : { ...f, songs: [...f.songs, cleanSong] }) };
+    });
+  }
+
+  function permanentlyDeleteSong(id) {
+    if (!confirm("Permanently delete this song? This cannot be undone.")) return;
+    setState(prev => ({ archived: prev.archived.filter(s => s.id !== id) }));
   }
 
   function assignSongToFolder(songId, folderId) {
@@ -576,8 +941,8 @@ export default function SongVault() {
             {backLabel}
           </button>
           <div style={{ flex: 1 }} />
-          <button onClick={e => { e.stopPropagation(); deleteSong(activeSong.id); }}
-            style={{ background: "none", border: "none", color: T.danger, fontSize: 15 }}>Delete</button>
+          <button onClick={e => { e.stopPropagation(); archiveSong(activeSong.id); }}
+            style={{ background: "none", border: "none", color: T.textMuted, fontSize: 15 }}>Archive</button>
         </>
       );
     }
@@ -592,7 +957,10 @@ export default function SongVault() {
     const displayName = session?.user?.username || session?.user?.email?.split("@")[0] || "Vault";
     return (
       <>
-        <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>Song Vault</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <MusicNoteKeyhole size={26} color={T.accent} />
+          <span style={{ fontSize: 17, fontWeight: 600, color: T.text }}>LyricLab</span>
+        </div>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 13, color: T.textMuted, marginRight: 10 }}>{displayName}</span>
         <button onClick={handleLogout}
@@ -648,6 +1016,20 @@ export default function SongVault() {
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #3A3A3C; border-radius: 3px; }
+
+        @keyframes keyhole-unlock {
+          0%   { opacity: 1; transform: scale(0.85); }
+          40%  { opacity: 1; transform: scale(1.05); }
+          75%  { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(0.95); }
+        }
+        .keyhole-icon {
+          animation: keyhole-unlock 1.8s ease-out forwards;
+          will-change: opacity, transform;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
 
         /* ── Layout shell ── */
         .app-root {
@@ -711,9 +1093,13 @@ export default function SongVault() {
         /* ── Content area ── */
         .content-scroll {
           flex: 1;
-          overflow-y: auto;
+          overflow: hidden;
           display: flex;
           flex-direction: column;
+        }
+        .content-main {
+          flex: 1;
+          overflow-y: auto;
         }
         .content-inner {
           width: 100%;
@@ -759,6 +1145,15 @@ export default function SongVault() {
         }
       `}</style>
 
+      {/* Unlock Animation */}
+      {isUnlocking && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, pointerEvents: "none" }}>
+          <div className="keyhole-icon">
+            <MusicNoteKeyhole size={140} color={T.accent} />
+          </div>
+        </div>
+      )}
+
       {/* Nav bar */}
       <div className="app-nav">
         {renderNavBar()}
@@ -791,6 +1186,7 @@ export default function SongVault() {
             </div>
           )}
 
+          <div className="content-main">
           <div className="content-inner">
 
         {/* Song detail */}
@@ -800,8 +1196,10 @@ export default function SongVault() {
             folderId={activeSongContext}
             folders={state}
             setFolders={setState}
-            onDelete={deleteSong}
+            onDelete={archiveSong}
             onAssign={assignSongToFolder}
+            soundcloudProfile={soundcloudProfile}
+            onPlayAudio={playAudio}
           />
         ) : (
 
@@ -813,9 +1211,9 @@ export default function SongVault() {
 
                 {allSongs.length === 0 && !showNewSong && (
                   <div style={{ textAlign: "center", padding: "60px 0 30px", color: T.textMuted }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🎵</div>
-                    <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 6, color: T.textSub }}>No songs yet</div>
-                    <div style={{ fontSize: 15 }}>Tap below to add your first song</div>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>✍️</div>
+                    <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 8, color: T.textSub }}>Your lab is empty</div>
+                    <div style={{ fontSize: 15, lineHeight: 1.6 }}>That song in your head?<br />Tap <strong style={{ color: T.accent }}>+</strong> to give it a home.</div>
                   </div>
                 )}
 
@@ -862,6 +1260,38 @@ export default function SongVault() {
                   <button onClick={() => { setActiveFolderId(null); setShowNewSong(true); }} className="press" style={dashedBtn()}>
                     + New Song
                   </button>
+                )}
+
+                {archived.length > 0 && (
+                  <div style={{ marginTop: 32 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.textMuted, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6, paddingLeft: 4 }}>Archived</div>
+                    <div style={listCard}>
+                      {archived.map((song, i) => {
+                        const origin = song._archivedFrom === "unassigned" ? "Unassigned" : (folders.find(f => f.id === song._archivedFrom)?.name ?? "Unknown");
+                        const st = STATUS[song.status] || STATUS.idea;
+                        return (
+                          <div key={song.id}>
+                            {i > 0 && <div style={rowDivider} />}
+                            <div style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 15, fontWeight: 500, color: T.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{song.title}</div>
+                                <div style={{ fontSize: 12, color: T.textFaint, marginTop: 2 }}>
+                                  <span style={{ color: st.color }}>{st.label}</span>
+                                  {" · "}from {origin}
+                                </div>
+                              </div>
+                              <button onClick={() => restoreSong(song.id)}
+                                style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, color: T.accent, fontSize: 13, padding: "5px 10px", flexShrink: 0 }}>
+                                Restore
+                              </button>
+                              <button onClick={() => permanentlyDeleteSong(song.id)}
+                                style={{ background: "none", border: "none", color: T.textFaint, fontSize: 22, lineHeight: 1, flexShrink: 0 }}>×</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -1001,6 +1431,7 @@ export default function SongVault() {
                     { label: "Unassigned songs",   value: unassigned.length },
                     { label: "Songs with lyrics",  value: allSongs.filter(({ song }) => song.lyrics?.trim()).length },
                     { label: "Songs with audio",   value: allSongs.filter(({ song }) => song.files?.some(f => f.type?.startsWith("audio/"))).length },
+                    { label: "Archived songs",     value: archived.length },
                   ].map(({ label, value }, i) => (
                     <div key={label}>
                       {i > 0 && <div style={{ height: 1, background: T.divider, marginLeft: 16 }} />}
@@ -1010,6 +1441,76 @@ export default function SongVault() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* SoundCloud */}
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ fontSize: 17, fontWeight: 600, color: T.text, marginBottom: 12 }}>SoundCloud</div>
+                  {soundcloudProfile?.verified ? (
+                    <div style={{ ...listCard, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: 22 }}>🎧</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{soundcloudProfile.username || soundcloudProfile.url}</div>
+                        <a href={`https://${soundcloudProfile.url}`} target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 13, color: T.accent, textDecoration: "none" }}>{soundcloudProfile.url}</a>
+                      </div>
+                      <button onClick={scDisconnect}
+                        style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 8, color: T.textMuted, fontSize: 13, padding: "6px 12px" }}>
+                        Disconnect
+                      </button>
+                    </div>
+                  ) : scCodeSent ? (
+                    <div style={listCard}>
+                      <div style={{ padding: "14px 16px" }}>
+                        <div style={{ fontSize: 14, color: T.textMuted, marginBottom: 12 }}>
+                          A 6-digit code was sent to your email. Enter it below to verify ownership of <strong style={{ color: T.text }}>{scInput}</strong>.
+                        </div>
+                        <input
+                          autoFocus
+                          placeholder="6-digit code"
+                          value={scCode}
+                          onChange={e => { setScCode(e.target.value); setScError(null); }}
+                          onKeyDown={e => { if (e.key === "Enter") scVerify(); }}
+                          maxLength={6}
+                          style={{ width: "100%", padding: "10px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 16, letterSpacing: 6, background: T.input, color: T.text, marginBottom: 10 }}
+                        />
+                        {scError && <div style={{ fontSize: 13, color: T.danger, marginBottom: 10 }}>{scError}</div>}
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => { setScCodeSent(false); setScCode(""); setScError(null); }}
+                            style={{ flex: 1, padding: "9px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.cardAlt, fontSize: 14, color: T.text }}>Back</button>
+                          <button onClick={scVerify} disabled={scVerifying || scCode.length < 6}
+                            style={{ flex: 1, padding: "9px", borderRadius: 9, border: "none", background: T.accent, fontSize: 14, fontWeight: 600, color: "#fff", opacity: (scVerifying || scCode.length < 6) ? 0.5 : 1 }}>
+                            {scVerifying ? "Verifying…" : "Verify"}
+                          </button>
+                        </div>
+                        <button onClick={scSendCode} style={{ background: "none", border: "none", color: T.accent, fontSize: 13, marginTop: 10, padding: 0 }}>
+                          Resend code
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={listCard}>
+                      <div style={{ padding: "14px 16px" }}>
+                        <div style={{ fontSize: 14, color: T.textMuted, marginBottom: 12 }}>
+                          Enter your SoundCloud profile URL. A verification code will be sent to your email.
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <input
+                            placeholder="soundcloud.com/yourname"
+                            value={scInput}
+                            onChange={e => { setScInput(e.target.value); setScError(null); }}
+                            onKeyDown={e => { if (e.key === "Enter") scSendCode(); }}
+                            style={{ flex: 1, padding: "10px 12px", borderRadius: 9, border: `1px solid ${T.border}`, fontSize: 15, background: T.input, color: T.text }}
+                          />
+                          <button onClick={scSendCode} disabled={scSending || !scInput.trim()}
+                            style={{ padding: "10px 16px", borderRadius: 9, border: "none", background: T.accent, color: "#fff", fontSize: 15, fontWeight: 600, opacity: (scSending || !scInput.trim()) ? 0.5 : 1 }}>
+                            {scSending ? "…" : "Send Code"}
+                          </button>
+                        </div>
+                        {scError && <div style={{ fontSize: 13, color: T.danger, marginTop: 8 }}>{scError}</div>}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Find Users */}
@@ -1054,7 +1555,7 @@ export default function SongVault() {
 
                 <div style={{ marginTop: 24 }}>
                   <button
-                    onClick={() => { if (confirm("Clear ALL data? This cannot be undone.")) { setState({ folders: [], unassigned: [] }); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); } }}
+                    onClick={() => { if (confirm("Clear ALL data? This cannot be undone.")) { setState({ folders: [], unassigned: [], archived: [], soundcloudProfile: null }); setScInput(""); setScCodeSent(false); setScCode(""); setScError(null); setActiveFolderId(null); setActiveSongId(null); setActiveSongContext(null); } }}
                     style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: T.card, fontSize: 15, color: T.danger, fontWeight: 500, boxShadow: T.shadow }}>
                     Clear All Data
                   </button>
@@ -1064,8 +1565,31 @@ export default function SongVault() {
           </>
         )}
           </div>
+          </div>
         </div>
       </div>
+
+      {/* Floating quick-create button */}
+      {!activeSong && !showNewSong && (
+        <button
+          onClick={quickCreateSong}
+          title="New song"
+          style={{
+            position: "fixed", bottom: 84, right: 20,
+            width: 56, height: 56, borderRadius: "50%",
+            background: T.accent, border: "none", color: "#fff",
+            fontSize: 28, fontWeight: 300, lineHeight: 1,
+            boxShadow: "0 4px 20px rgba(10,132,255,0.45)",
+            cursor: "pointer", zIndex: 200,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "transform 0.15s, opacity 0.15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.08)"}
+          onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }
