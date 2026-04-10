@@ -635,6 +635,7 @@ export default function SongVault() {
   }, [state, session, loading]);
 
   function handleAuth(user) {
+    setLoading(true); // block auto-save until real data is loaded
     setSession({ user });
     setIsUnlocking(true);
     setTimeout(() => {
