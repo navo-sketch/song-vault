@@ -602,6 +602,7 @@ export default function SongVault() {
   const [session,  setSession]  = useState(initialSession);
   const [loading,  setLoading]  = useState(!!initialSession);
   const [showAuth, setShowAuth] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
   const [state,    setStateRaw] = useState({ folders: [], unassigned: [], archived: [], soundcloudProfile: null });
   const saveTimerRef            = useRef(null);
 
@@ -634,7 +635,11 @@ export default function SongVault() {
 
   function handleAuth(user) {
     setSession({ user });
-    loadData();
+    setIsUnlocking(true);
+    setTimeout(() => {
+      setIsUnlocking(false);
+      loadData();
+    }, 1200);
   }
 
   async function handleLogout() {
@@ -956,6 +961,10 @@ export default function SongVault() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #3A3A3C; border-radius: 3px; }
 
+        @keyframes unlock-spin { 0% { transform: rotateZ(0deg); } 50% { transform: rotateZ(-15deg); } 100% { transform: rotateZ(0deg); } }
+        @keyframes unlock-fade { 0% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: scale(0.8); } }
+        .unlock-lock { animation: unlock-spin 0.6s ease-in-out, unlock-fade 1.2s ease-out forwards; }
+
         /* ── Layout shell ── */
         .app-root {
           height: 100vh;
@@ -1069,6 +1078,15 @@ export default function SongVault() {
           .content-inner { max-width: 960px; }
         }
       `}</style>
+
+      {/* Unlock Animation */}
+      {isUnlocking && (
+        <div style={{ position: "fixed", inset: 0, background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div className="unlock-lock" style={{ fontSize: 80, animation: "unlock-spin 0.6s ease-in-out, unlock-fade 1.2s ease-out forwards" }}>
+            🔓
+          </div>
+        </div>
+      )}
 
       {/* Nav bar */}
       <div className="app-nav">
