@@ -806,15 +806,30 @@ export default function LyricLab() {
       });
       navigator.mediaSession.setActionHandler("play", () => globalAudioElement.play());
       navigator.mediaSession.setActionHandler("pause", () => globalAudioElement.pause());
+      navigator.mediaSession.playbackState = "playing";
     }
   }
 
   useEffect(() => {
-    if (!nowPlaying) return;
-    if (navigator.mediaSession) {
-      navigator.mediaSession.playbackState = globalAudioElement.paused ? "paused" : "playing";
+    function onPlay() {
+      if (navigator.mediaSession) navigator.mediaSession.playbackState = "playing";
     }
-  }, [nowPlaying]);
+    function onPause() {
+      if (navigator.mediaSession) navigator.mediaSession.playbackState = "paused";
+    }
+    function onEnded() {
+      if (navigator.mediaSession) navigator.mediaSession.playbackState = "none";
+      setNowPlaying(null);
+    }
+    globalAudioElement.addEventListener("play", onPlay);
+    globalAudioElement.addEventListener("pause", onPause);
+    globalAudioElement.addEventListener("ended", onEnded);
+    return () => {
+      globalAudioElement.removeEventListener("play", onPlay);
+      globalAudioElement.removeEventListener("pause", onPause);
+      globalAudioElement.removeEventListener("ended", onEnded);
+    };
+  }, []);
 
   function createFolder() {
     if (!newFolderName.trim()) return;
